@@ -10,3 +10,17 @@ export function getSupabaseAdmin() {
 export function getBucketName() {
 	return process.env.SUPABASE_STORAGE_BUCKET || 'pdfs'
 }
+
+export async function getSignedDownloadUrl(storagePath: string) {
+	const supabase = getSupabaseAdmin()
+	const bucket = getBucketName()
+
+	const { data, error } = await supabase.storage.from(bucket).createSignedUrl(storagePath, 3600) // 1 hour expiry
+
+	if (error) {
+		console.error('Error creating signed URL:', error)
+		return null
+	}
+
+	return data.signedUrl
+}
