@@ -13,13 +13,32 @@ export async function POST(request: Request) {
 		const body = await request.json()
 		const fileName: string = body?.fileName
 		const contentType: string = body?.contentType || 'application/pdf'
+		const action: string = body?.action || 'upload'
+		const storagePath: string = body?.storagePath
+
 		if (!fileName) return NextResponse.json({ message: 'fileName required' }, { status: 400 })
 
 		const userId = (session.user as any).id as string
 		const bucket = getBucketName()
+		const supabase = getSupabaseAdmin()
+
+		// Handle download requests
+		if (action === 'download' && storagePath) {
+			const { data, error } = await supabase.storage.from(bucket).createSignedUrl(storagePath, 3600) // 1 hour expiry
+
+			if (error || !data) {
+				console.error('Download signed URL error:', error)
+				return NextResponse.json({ message: 'Failed to create download URL' }, { status: 500 })
+			}
+
+			return NextResponse.json({
+				signedUrl: data.signedUrl
+			})
+		}
+
+		// Handle upload requests (existing logic)
 		const path = `${userId}/${Date.now()}-${fileName}`
 
-		const supabase = getSupabaseAdmin()
 		// Ensure bucket exists (idempotent)
 		try {
 			await supabase.storage.createBucket(bucket, { public: false })
