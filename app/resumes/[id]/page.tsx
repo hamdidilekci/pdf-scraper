@@ -1,13 +1,34 @@
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import JsonViewer from '@/components/JsonViewer'
 import PdfViewer from '@/components/PdfViewer'
+import { Button } from '@/components/ui/button'
 
 type Props = { params: { id: string } }
 
 export default async function ResumeDetailPage({ params }: Props) {
-	const item: any = await(prisma as any).resume.findUnique({
-		where: { id: params.id },
+	const session = await getServerSession(authOptions)
+
+	if (!session) {
+		return (
+			<div className="text-center py-12">
+				<h1 className="text-2xl font-semibold text-gray-900 mb-4">Access Denied</h1>
+				<p className="text-gray-600 mb-6">Please sign in to view this resume.</p>
+				<Link href="/sign-in" className="text-blue-600 hover:underline">
+					Sign in
+				</Link>
+			</div>
+		)
+	}
+
+	const userId = (session.user as any)?.id as string
+	const item: any = await (prisma as any).resume.findFirst({
+		where: {
+			id: params.id,
+			userId: userId
+		},
 		include: { histories: true }
 	})
 
@@ -17,11 +38,13 @@ export default async function ResumeDetailPage({ params }: Props) {
 				<div className="text-center py-12">
 					<h1 className="text-2xl font-semibold text-gray-900 mb-4">Resume Not Found</h1>
 					<p className="text-gray-600 mb-6">The resume you&apos;re looking for doesn&apos;t exist or has been deleted.</p>
-					<Link href="/resumes" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-						<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-						</svg>
-						Back to Resumes
+					<Link href="/resumes">
+						<Button className="inline-flex items-center">
+							<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+							</svg>
+							Back to Resumes
+						</Button>
 					</Link>
 				</div>
 			</div>

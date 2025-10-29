@@ -1,8 +1,27 @@
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { Button } from '@/components/ui/button'
 
 export default async function ResumesPage() {
-	const items: any[] = await (prisma as any).resume.findMany({
+	const session = await getServerSession(authOptions)
+
+	if (!session) {
+		return (
+			<div className="text-center py-12">
+				<h1 className="text-2xl font-semibold text-gray-900 mb-4">Access Denied</h1>
+				<p className="text-gray-600 mb-6">Please sign in to view your resumes.</p>
+				<Link href="/sign-in" className="text-blue-600 hover:underline">
+					Sign in
+				</Link>
+			</div>
+		)
+	}
+
+	const userId = (session.user as any)?.id as string
+	const items: any[] = await(prisma as any).resume.findMany({
+		where: { userId },
 		orderBy: { uploadedAt: 'desc' },
 		select: { id: true, fileName: true, uploadedAt: true, status: true }
 	})
@@ -11,8 +30,8 @@ export default async function ResumesPage() {
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
 				<h1 className="text-2xl font-semibold">Your Resumes</h1>
-				<Link href="/upload" className="rounded bg-blue-600 px-3 py-2 text-white">
-					Upload New
+				<Link href="/upload">
+					<Button>Upload New</Button>
 				</Link>
 			</div>
 			<div className="rounded border bg-white p-6">
@@ -28,8 +47,10 @@ export default async function ResumesPage() {
 										{new Date(it.uploadedAt).toLocaleString()} · {it.status}
 									</p>
 								</div>
-								<Link href={`/resumes/${it.id}`} className="rounded border px-3 py-1">
-									View
+								<Link href={`/resumes/${it.id}`}>
+									<Button variant="outline" size="sm">
+										View
+									</Button>
 								</Link>
 							</li>
 						))}
