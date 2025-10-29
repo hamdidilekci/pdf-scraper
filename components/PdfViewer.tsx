@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface PdfViewerProps {
 	storagePath: string
@@ -57,10 +58,13 @@ export default function PdfViewer({ storagePath, fileName }: PdfViewerProps) {
 
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg border">
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-					<p className="text-sm text-gray-600">Loading PDF...</p>
+			<div className="space-y-4">
+				<div className="flex items-center justify-between">
+					<Skeleton className="h-6 w-32" />
+					<Skeleton className="h-8 w-24" />
+				</div>
+				<div className="border rounded-lg overflow-hidden">
+					<Skeleton className="w-full h-96" />
 				</div>
 			</div>
 		)

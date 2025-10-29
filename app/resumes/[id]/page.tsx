@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import JsonViewer from '@/components/JsonViewer'
 import PdfViewer from '@/components/PdfViewer'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type Props = { params: { id: string } }
 
@@ -53,6 +54,23 @@ export default async function ResumeDetailPage({ params }: Props) {
 
 	return (
 		<div className="space-y-6">
+			{/* Breadcrumbs */}
+			<nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
+				<Link href="/" className="hover:text-gray-900">
+					Home
+				</Link>
+				<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+				</svg>
+				<Link href="/resumes" className="hover:text-gray-900">
+					Resumes
+				</Link>
+				<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+				</svg>
+				<span className="text-gray-900 font-medium truncate max-w-xs">{item.fileName}</span>
+			</nav>
+
 			{/* Header with back navigation */}
 			<div className="flex items-center justify-between">
 				<div className="flex items-center space-x-4">

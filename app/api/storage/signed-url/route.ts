@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getSupabaseAdmin, getBucketName } from '@/lib/supabase'
+import prisma from '@/lib/prisma'
 
 export async function POST(request: Request) {
 	const session = await getServerSession(authOptions)
@@ -24,10 +25,13 @@ export async function POST(request: Request) {
 
 		// Handle download requests
 		if (action === 'download' && storagePath) {
-			const { data, error } = await supabase.storage.from(bucket).createSignedUrl(storagePath, 3600) // 1 hour expiry
+			// Decode the storage path to handle URL-encoded characters
+			const decodedStoragePath = decodeURIComponent(storagePath)
+			const { data, error } = await supabase.storage.from(bucket).createSignedUrl(decodedStoragePath, 3600) // 1 hour expiry
 
 			if (error || !data) {
 				console.error('Download signed URL error:', error)
+				console.error('Storage path that failed:', decodedStoragePath)
 				return NextResponse.json({ message: 'Failed to create download URL' }, { status: 500 })
 			}
 
@@ -37,7 +41,28 @@ export async function POST(request: Request) {
 		}
 
 		// Handle upload requests (existing logic)
-		const path = `${userId}/${Date.now()}-${fileName}`
+		// Create a safe storage path using a hash-based filename to avoid special character issues
+		const crypto = require('crypto')
+		const fileExtension = fileName.split('.').pop() || 'pdf'
+		const fileNameHash = crypto.createHash('md5').update(fileName).digest('hex').substring(0, 8)
+		const safeFileName = `${fileNameHash}.${fileExtension}`
+		const path = `${userId}/${Date.now()}-${safeFileName}`
+
+		// Store the original filename mapping in the database for later retrieval
+		// We'll create a temporary record that will be updated during extraction
+		try {
+			await (prisma as any).resume.create({
+				data: {
+					userId,
+					fileName: fileName, // Store original filename
+					storagePath: path,
+					status: 'PENDING'
+				}
+			})
+		} catch (dbError) {
+			console.error('Failed to create resume record:', dbError)
+			// Continue with upload even if DB fails
+		}
 
 		// Ensure bucket exists (idempotent)
 		try {

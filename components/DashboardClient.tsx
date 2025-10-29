@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface DashboardData {
 	totalResumes: number
@@ -41,10 +42,55 @@ export default function DashboardClient() {
 
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center min-h-[50vh]">
-				<div className="flex items-center gap-2">
-					<div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
-					<span className="text-sm text-gray-600">Loading dashboard...</span>
+			<div className="space-y-6">
+				<div className="flex items-center justify-between">
+					<div>
+						<Skeleton className="h-8 w-48 mb-2" />
+						<Skeleton className="h-4 w-32" />
+					</div>
+				</div>
+
+				{/* Statistics Section Skeleton */}
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+					{[...Array(4)].map((_, i) => (
+						<div key={i} className="bg-white rounded-lg border p-6">
+							<div className="flex items-center">
+								<Skeleton className="p-2 rounded-lg w-10 h-10" />
+								<div className="ml-4 flex-1">
+									<Skeleton className="h-4 w-24 mb-2" />
+									<Skeleton className="h-8 w-16" />
+								</div>
+							</div>
+						</div>
+					))}
+				</div>
+
+				{/* Quick Actions Skeleton */}
+				<div className="bg-white rounded-lg border p-6">
+					<Skeleton className="h-6 w-32 mb-4" />
+					<div className="flex flex-col sm:flex-row gap-3">
+						<Skeleton className="h-10 w-40" />
+						<Skeleton className="h-10 w-40" />
+					</div>
+				</div>
+
+				{/* Recent Uploads Skeleton */}
+				<div className="bg-white rounded-lg border p-6">
+					<Skeleton className="h-6 w-32 mb-4" />
+					<div className="space-y-3">
+						{[...Array(3)].map((_, i) => (
+							<div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+								<div className="flex-1">
+									<Skeleton className="h-5 w-48 mb-1" />
+									<Skeleton className="h-4 w-32" />
+								</div>
+								<div className="flex items-center gap-3">
+									<Skeleton className="h-6 w-16 rounded-full" />
+									<Skeleton className="h-6 w-12" />
+								</div>
+							</div>
+						))}
+					</div>
 				</div>
 			</div>
 		)
@@ -53,9 +99,32 @@ export default function DashboardClient() {
 	if (!data) {
 		return (
 			<div className="text-center py-12">
+				<div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+					<svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							strokeWidth={2}
+							d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z"
+						/>
+					</svg>
+				</div>
 				<h1 className="text-2xl font-semibold text-gray-900 mb-4">Error Loading Dashboard</h1>
-				<p className="text-gray-600 mb-6">Unable to load dashboard data. Please try refreshing the page.</p>
-				<Button onClick={() => window.location.reload()}>Refresh Page</Button>
+				<p className="text-gray-600 mb-6">Unable to load dashboard data. Please try again.</p>
+				<div className="flex flex-col sm:flex-row gap-3 justify-center">
+					<Button onClick={() => window.location.reload()}>Refresh Page</Button>
+					<Button
+						variant="outline"
+						onClick={() => {
+							setLoading(true)
+							setData(null)
+							// Trigger re-fetch
+							window.location.reload()
+						}}
+					>
+						Try Again
+					</Button>
+				</div>
 			</div>
 		)
 	}
