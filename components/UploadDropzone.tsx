@@ -1,0 +1,148 @@
+'use client'
+
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
+
+type Step = 'idle' | 'uploading' | 'extracting' | 'done' | 'error'
+
+export default function UploadDropzone() {
+	const [dragOver, setDragOver] = useState(false)
+	const [file, setFile] = useState<File | null>(null)
+	const [error, setError] = useState<string | null>(null)
+	const [step, setStep] = useState<Step>('idle')
+	const inputRef = useRef<HTMLInputElement>(null)
+
+	const onSelect = useCallback((f: File) => {
+		setError(null)
+		if (f.type !== 'application/pdf') {
+			setError('Only PDF files are supported')
+			toast.error('Only PDF files are supported')
+			return
+		}
+		const maxBytes = 10 * 1024 * 1024
+		if (f.size > maxBytes) {
+			setError('File exceeds 10MB limit')
+			toast.error('File exceeds 10MB limit')
+			return
+		}
+		setFile(f)
+		toast.success('File ready to upload')
+	}, [])
+
+	const onDrop = useCallback(
+		(e: React.DragEvent<HTMLDivElement>) => {
+			e.preventDefault()
+			setDragOver(false)
+			const f = e.dataTransfer.files?.[0]
+			if (f) onSelect(f)
+		},
+		[onSelect]
+	)
+
+	const onBrowse = useCallback(() => {
+		inputRef.current?.click()
+	}, [])
+
+	const reset = useCallback(() => {
+		setFile(null)
+		setError(null)
+		setStep('idle')
+	}, [])
+
+	const canSubmit = useMemo(() => !!file && step !== 'uploading' && step !== 'extracting', [file, step])
+
+	const start = useCallback(async () => {
+		if (!file) return
+		setError(null)
+		// Step 1: request signed URL
+		try {
+			setStep('uploading')
+			toast.info('Requesting upload URL…')
+			const signedRes = await fetch('/api/storage/signed-url', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ fileName: file.name, contentType: 'application/pdf' })
+			})
+			if (!signedRes.ok) throw new Error('Failed to get upload URL')
+			const { signedUrl, storagePath } = await signedRes.json()
+
+			// Step 2: upload to storage
+			toast.info('Uploading…')
+			const putRes = await fetch(signedUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/pdf' } })
+			if (!putRes.ok) throw new Error('Failed to upload file')
+
+			// Step 3: trigger extraction (API will determine text/image later)
+			setStep('extracting')
+			toast.info('Extracting data…')
+			const extractRes = await fetch('/api/extract', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ storagePath })
+			})
+			if (!extractRes.ok) throw new Error('Extraction failed')
+
+			setStep('done')
+			toast.success('Extraction complete')
+		} catch (err: any) {
+			setStep('error')
+			const msg = err?.message || 'Unexpected error'
+			setError(msg)
+			toast.error(msg)
+		}
+	}, [file])
+
+	return (
+		<div className="space-y-4">
+			<div
+				onDragOver={(e) => {
+					e.preventDefault()
+					setDragOver(true)
+				}}
+				onDragLeave={() => setDragOver(false)}
+				onDrop={onDrop}
+				className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded border border-dashed ${
+					dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white'
+				}`}
+				onClick={onBrowse}
+			>
+				<p className="text-sm">Drag & drop your PDF here, or click to browse</p>
+				<p className="mt-1 text-xs text-gray-500">Max 10MB</p>
+				<input
+					ref={inputRef}
+					type="file"
+					accept="application/pdf"
+					className="hidden"
+					onChange={(e) => {
+						const f = e.target.files?.[0]
+						if (f) onSelect(f)
+					}}
+				/>
+			</div>
+
+			{file && (
+				<div className="rounded border bg-white p-3 text-sm">
+					<p className="font-medium">Selected:</p>
+					<p className="text-gray-700">
+						{file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+					</p>
+				</div>
+			)}
+
+			{error && <p className="text-sm text-red-600">{error}</p>}
+
+			<div className="flex gap-3">
+				<button onClick={start} disabled={!canSubmit} className="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">
+					{step === 'uploading' ? 'Uploading…' : step === 'extracting' ? 'Extracting…' : 'Start'}
+				</button>
+				{(file || step !== 'idle') && (
+					<button onClick={reset} className="rounded border px-3 py-2">
+						Reset
+					</button>
+				)}
+			</div>
+
+			{step === 'done' && <p className="text-sm text-green-700">Upload and extraction complete. You can view it in your dashboard.</p>}
+			{step === 'error' && <p className="text-sm text-red-700">An error occurred. Backend endpoints may not be ready yet.</p>}
+		</div>
+	)
+}
