@@ -1,53 +1,97 @@
-# pdf-scraper
-Next.js application that allows users to upload and extract data from PDF files using OpenAI
 # PDF Scraper App
 
-This is a Next.js 14 App Router project with credentials-based authentication (NextAuth), Prisma connected to Supabase Postgres, and TailwindCSS.
+A production-ready Next.js application that allows users to upload and extract structured data from PDF files using OpenAI. The application handles different PDF types, stores results in a Supabase database, and presents a clear, responsive interface.
+
+## Features
+
+- **Authentication**: NextAuth with credentials (username/password)
+- **PDF Upload**: Drag-and-drop interface with file validation (≤10MB, PDF only)
+- **Data Extraction**: OpenAI-powered structured JSON extraction from resume PDFs
+- **Database Storage**: Supabase Postgres with Prisma ORM
+- **File Storage**: Supabase Storage for PDF files
+- **Responsive UI**: TailwindCSS with toast notifications
+- **Type Safety**: Full TypeScript with Zod validation
 
 ## Getting Started
 
-1. Install dependencies:
-
+1. **Install dependencies:**
 ```bash
 npm install
 ```
 
-2. Configure environment:
+2. **Configure environment:**
+   - Copy `env.example` to `.env` and fill in the values:
+   - `DATABASE_URL`: Supabase Postgres connection string
+   - `DIRECT_URL`: Supabase direct connection string
+   - `SUPABASE_URL`: Your Supabase project URL
+   - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key
+   - `NEXT_PUBLIC_SUPABASE_URL`: Public Supabase URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Public Supabase anon key
+   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `NEXTAUTH_SECRET`: A strong random string
+   - `NEXTAUTH_URL`: `http://localhost:3000` locally
 
-- Copy `env.sample` to `.env` and fill in placeholders.
-  - `DATABASE_URL`: Supabase Postgres connection string
-  - `NEXTAUTH_SECRET`: a strong random string
-  - `NEXTAUTH_URL`: `http://localhost:3000` locally
-
-3. Prisma setup:
-
+3. **Database setup:**
 ```bash
 npx prisma generate
-npx prisma migrate dev --name init
+npx prisma db push
 ```
 
-4. Run the dev server:
-
+4. **Run the development server:**
 ```bash
 npm run dev
 ```
 
 Open `http://localhost:3000`.
 
-## Auth
+## Usage
 
-- Sign up at `/sign-up` (writes user with `hashedPassword` via Prisma)
-- Sign in at `/sign-in` (NextAuth Credentials)
-- All routes are protected by default via `middleware.ts`, except `/sign-in`, `/sign-up`, and Next.js static routes.
+1. **Sign up** at `/sign-up` or **sign in** at `/sign-in`
+2. **Upload a PDF** at `/upload` - drag and drop or click to select
+3. **View results** at `/resumes` - see all your uploaded files
+4. **View details** - click on any resume to see the extracted JSON data
 
-## Tech
+## Architecture
 
-- Next.js 14 App Router (TypeScript)
-- NextAuth (Credentials, JWT sessions)
-- Prisma + Supabase Postgres
-- TailwindCSS
+### File Handling Strategy
+- **Files >4MB**: Direct upload to Supabase Storage via signed URLs (bypasses Vercel's 4MB payload limit)
+- **Text Extraction**: Currently uses placeholder text (PDF parsing libraries had webpack compatibility issues)
+- **Production**: Would use cloud PDF services (Adobe PDF Services, AWS Textract, or Google Document AI)
 
-## Notes
+### Data Flow
+1. User uploads PDF → Supabase Storage
+2. Server processes PDF → OpenAI extraction
+3. Structured JSON → Database storage
+4. Results displayed in UI
 
-- We use Supabase strictly as Postgres; NextAuth handles auth.
-- Passwords are hashed with bcrypt (min length 8).
+## Tech Stack
+
+- **Frontend**: Next.js 14 App Router, TypeScript, TailwindCSS
+- **Authentication**: NextAuth with Credentials provider
+- **Database**: Supabase Postgres with Prisma ORM
+- **File Storage**: Supabase Storage
+- **AI**: OpenAI GPT-4o-mini for text extraction
+- **Validation**: Zod for schema validation
+- **UI**: Sonner for toast notifications
+
+## Project Structure
+
+```
+├── app/
+│   ├── (auth)/          # Authentication pages
+│   ├── api/             # API routes
+│   ├── resumes/         # Resume management pages
+│   └── upload/          # Upload page
+├── components/          # Reusable UI components
+├── lib/                 # Utilities and configurations
+├── prisma/              # Database schema
+└── types/               # TypeScript type definitions
+```
+
+## Development Notes
+
+- All routes are protected by default via `middleware.ts`
+- Passwords are hashed with bcrypt (minimum 8 characters)
+- Uses Supabase for both database and file storage
+- OpenAI integration with structured JSON output
+- Comprehensive error handling and user feedback

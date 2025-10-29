@@ -7,13 +7,13 @@ export const languageLevelEnum = z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED',
 
 export const resumeJsonSchema = z.object({
 	profile: z.object({
-		name: z.string(),
-		surname: z.string(),
-		email: z.string().email(),
+		name: z.string().optional().default(''),
+		surname: z.string().optional().default(''),
+		email: z.string().optional().default(''),
 		headline: z.string().optional().default(''),
 		professionalSummary: z.string().optional().default(''),
-		linkedIn: z.string().url().optional().default(''),
-		website: z.string().url().optional().default(''),
+		linkedIn: z.string().optional().default(''),
+		website: z.string().optional().default(''),
 		country: z.string().optional().default(''),
 		city: z.string().optional().default(''),
 		relocation: z.boolean().optional().default(false),
@@ -22,10 +22,10 @@ export const resumeJsonSchema = z.object({
 	workExperiences: z
 		.array(
 			z.object({
-				jobTitle: z.string(),
-				employmentType: employmentTypeEnum,
-				locationType: locationTypeEnum,
-				company: z.string(),
+				jobTitle: z.string().optional().default(''),
+				employmentType: employmentTypeEnum.optional().default('FULL_TIME'),
+				locationType: locationTypeEnum.optional().default('ONSITE'),
+				company: z.string().optional().default(''),
 				startMonth: z.number().int().min(1).max(12).optional().nullable(),
 				startYear: z.number().int().min(1900).max(2100).optional().nullable(),
 				endMonth: z.number().int().min(1).max(12).optional().nullable(),
@@ -39,9 +39,9 @@ export const resumeJsonSchema = z.object({
 	educations: z
 		.array(
 			z.object({
-				school: z.string(),
-				degree: degreeEnum,
-				major: z.string(),
+				school: z.string().optional().default(''),
+				degree: degreeEnum.optional().default('BACHELOR'),
+				major: z.string().optional().default(''),
 				startYear: z.number().int().min(1900).max(2100).optional().nullable(),
 				endYear: z.number().int().min(1900).max(2100).optional().nullable(),
 				current: z.boolean().optional().default(false),
@@ -54,8 +54,8 @@ export const resumeJsonSchema = z.object({
 	licenses: z
 		.array(
 			z.object({
-				name: z.string(),
-				issuer: z.string(),
+				name: z.string().optional().default(''),
+				issuer: z.string().optional().default(''),
 				issueYear: z.number().int().min(1900).max(2100).optional().nullable(),
 				description: z.string().optional().default('')
 			})
@@ -65,8 +65,8 @@ export const resumeJsonSchema = z.object({
 	languages: z
 		.array(
 			z.object({
-				language: z.string(),
-				level: languageLevelEnum
+				language: z.string().optional().default(''),
+				level: languageLevelEnum.optional().default('INTERMEDIATE')
 			})
 		)
 		.optional()
@@ -74,8 +74,8 @@ export const resumeJsonSchema = z.object({
 	achievements: z
 		.array(
 			z.object({
-				title: z.string(),
-				organization: z.string(),
+				title: z.string().optional().default(''),
+				organization: z.string().optional().default(''),
 				achieveDate: z.string().optional().default(''),
 				description: z.string().optional().default('')
 			})
@@ -85,10 +85,10 @@ export const resumeJsonSchema = z.object({
 	publications: z
 		.array(
 			z.object({
-				title: z.string(),
-				publisher: z.string(),
+				title: z.string().optional().default(''),
+				publisher: z.string().optional().default(''),
 				publicationDate: z.string().optional().default(''),
-				publicationUrl: z.string().url().optional().default(''),
+				publicationUrl: z.string().optional().default(''),
 				description: z.string().optional().default('')
 			})
 		)
@@ -97,8 +97,8 @@ export const resumeJsonSchema = z.object({
 	honors: z
 		.array(
 			z.object({
-				title: z.string(),
-				issuer: z.string(),
+				title: z.string().optional().default(''),
+				issuer: z.string().optional().default(''),
 				issueMonth: z.number().int().min(1).max(12).optional().nullable(),
 				issueYear: z.number().int().min(1900).max(2100).optional().nullable(),
 				description: z.string().optional().default('')

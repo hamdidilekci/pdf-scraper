@@ -2,6 +2,9 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { getSupabaseClient } from '@/lib/supabase-client'
+
+// Server-side PDF processing - no client-side extraction needed
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'done' | 'error'
 
@@ -54,7 +57,6 @@ export default function UploadDropzone() {
 	const start = useCallback(async () => {
 		if (!file) return
 		setError(null)
-		// Step 1: request signed URL
 		try {
 			setStep('uploading')
 			toast.info('Requesting upload URL…')
@@ -64,25 +66,35 @@ export default function UploadDropzone() {
 				body: JSON.stringify({ fileName: file.name, contentType: 'application/pdf' })
 			})
 			if (!signedRes.ok) throw new Error('Failed to get upload URL')
-			const { signedUrl, storagePath } = await signedRes.json()
+			const { bucket, storagePath, token } = await signedRes.json()
 
-			// Step 2: upload to storage
-			toast.info('Uploading…')
-			const putRes = await fetch(signedUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/pdf' } })
-			if (!putRes.ok) throw new Error('Failed to upload file')
+			const supabase = getSupabaseClient()
+			toast.info('Uploading to storage…')
+			const { error: upErr } = await supabase.storage.from(bucket).uploadToSignedUrl(storagePath, token, file, {
+				contentType: 'application/pdf'
+			})
+			if (upErr) throw upErr
 
-			// Step 3: trigger extraction (API will determine text/image later)
 			setStep('extracting')
-			toast.info('Extracting data…')
+			toast.info('Processing PDF…')
+
 			const extractRes = await fetch('/api/extract', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ storagePath })
 			})
-			if (!extractRes.ok) throw new Error('Extraction failed')
+			if (!extractRes.ok) {
+				const errorData = await extractRes.json().catch(() => ({}))
+				throw new Error(errorData.message || 'Extraction failed')
+			}
 
 			setStep('done')
 			toast.success('Extraction complete')
+
+			// Redirect to resumes page after successful upload
+			setTimeout(() => {
+				window.location.href = '/resumes'
+			}, 2000)
 		} catch (err: any) {
 			setStep('error')
 			const msg = err?.message || 'Unexpected error'
