@@ -11,11 +11,11 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en">
-			<body>
+		<html lang="en" className="h-full">
+			<body className="min-h-screen flex flex-col">
 				<Providers>
 					<Navbar />
-					<main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+					<main className="mx-auto max-w-5xl px-4 py-4 md:py-8 flex-1 w-full">{children}</main>
 					<Footer />
 				</Providers>
 			</body>
