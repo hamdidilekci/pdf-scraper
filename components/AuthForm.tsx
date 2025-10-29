@@ -6,6 +6,10 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { signIn } from 'next-auth/react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
 
 const schema = z.object({
 	email: z.string().email(),
@@ -60,21 +64,25 @@ export default function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 	}
 
 	return (
-		<form onSubmit={handleSubmit(onSubmit)} className="mx-auto w-full max-w-sm space-y-4">
-			<div>
-				<label className="mb-1 block text-sm">Email</label>
-				<input type="email" className="w-full rounded border px-3 py-2" placeholder="you@example.com" {...register('email')} />
-				{errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
-			</div>
-			<div>
-				<label className="mb-1 block text-sm">Password</label>
-				<input type="password" className="w-full rounded border px-3 py-2" placeholder="••••••••" {...register('password')} />
-				{errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
-			</div>
-			{error && <p className="text-sm text-red-600">{error}</p>}
-			<button type="submit" disabled={loading} className="w-full rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">
-				{loading ? (mode === 'sign-up' ? 'Creating account...' : 'Signing in...') : mode === 'sign-up' ? 'Create account' : 'Sign in'}
-			</button>
-		</form>
+		<Card className="mx-auto w-full max-w-sm">
+			<CardContent className="pt-6">
+				<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+					<div>
+						<Label htmlFor="email">Email</Label>
+						<Input id="email" type="email" placeholder="you@example.com" {...register('email')} />
+						{errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
+					</div>
+					<div>
+						<Label htmlFor="password">Password</Label>
+						<Input id="password" type="password" placeholder="••••••••" {...register('password')} />
+						{errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
+					</div>
+					{error && <p className="text-sm text-red-600">{error}</p>}
+					<Button type="submit" disabled={loading} className="w-full">
+						{loading ? (mode === 'sign-up' ? 'Creating account...' : 'Signing in...') : mode === 'sign-up' ? 'Create account' : 'Sign in'}
+					</Button>
+				</form>
+			</CardContent>
+		</Card>
 	)
 }
