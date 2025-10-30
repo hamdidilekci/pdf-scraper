@@ -102,4 +102,6 @@ Rules:
 - For work experience, infer location type from context (onsite if not specified)
 - For education, infer degree level from context (bachelor if not specified)
 - For languages, infer level from context (intermediate if not specified)
+ - Return ONLY the JSON object; no markdown, no code fences, no prose
+ - Ensure enums strictly match the allowed values (employmentType, locationType, degree, language level)
 `

@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getSupabaseAdmin, getBucketName } from '@/lib/supabase'
+import { extractionSystemPrompt } from '@/lib/prompt'
+import { resumeJsonSchema } from '@/lib/types'
+import { normalizeResume } from '@/lib/normalizeResume'
 
 export const runtime = 'nodejs'
 
@@ -12,22 +15,7 @@ type Body = {
 }
 
 const RESPONSES_URL = 'https://api.openai.com/v1/responses'
-const DEFAULT_MODEL = process.env.OPENAI_RESPONSES_MODEL || 'gpt-4.1-mini'
-
-const extractionPrompt = `You are a data extraction assistant.
-Analyze the attached PDF and return ONLY a JSON matching exactly this schema:
-{
-  "name": "string",
-  "email": "string",
-  "skills": ["string"],
-  "experience": [
-    { "company": "string", "position": "string", "years": 0 }
-  ]
-}
-Rules:
-- Return ONLY valid JSON, no markdown, no prose.
-- Use empty strings and [] where data is missing.
-`
+const DEFAULT_MODEL = process.env.OPENAI_RESPONSES_MODEL || 'gpt-4.1'
 
 export async function POST(req: Request) {
 	const session = await getServerSession(authOptions)
@@ -106,13 +94,15 @@ export async function POST(req: Request) {
 		}
 
 		// 2) Call Responses API referencing uploaded file
-		const responsesBody = {
+		const responsesBody: any = {
 			model: requestedModel,
+			temperature: 0,
+			text: { format: { type: 'json_object' } },
 			input: [
 				{
 					role: 'user',
 					content: [
-						{ type: 'input_text', text: extractionPrompt },
+						{ type: 'input_text', text: extractionSystemPrompt },
 						// Use input_file for PDF references per Responses API
 						{ type: 'input_file', file_id: fileId }
 					]
@@ -170,22 +160,75 @@ export async function POST(req: Request) {
 		try {
 			json = JSON.parse(outputText)
 		} catch (e: any) {
-			// Store raw for debugging
+			// Attempt a single remediation pass by re-prompting with validation error guidance
+			const retryBody = {
+				...responsesBody,
+				input: [
+					{
+						role: 'user',
+						content: [
+							{
+								type: 'input_text',
+								text: `${extractionSystemPrompt}\nReturn ONLY a valid JSON object without markdown. If previous output was invalid, strictly follow the schema now.`
+							},
+							{ type: 'input_file', file_id: fileId }
+						]
+					}
+				]
+			}
+			const retryResp = await fetch(RESPONSES_URL, {
+				method: 'POST',
+				headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+				body: JSON.stringify(retryBody)
+			})
+			const retryRaw = await retryResp.text()
+			let retryParsed: any = {}
+			try {
+				retryParsed = JSON.parse(retryRaw)
+			} catch {
+				retryParsed = { raw: retryRaw }
+			}
+			let retryText = ''
+			if (retryParsed?.output_text) retryText = retryParsed.output_text
+			else if (Array.isArray(retryParsed?.output)) {
+				const firstText = retryParsed.output.find((p: any) => p?.content?.[0]?.type === 'output_text')
+				retryText = firstText?.content?.[0]?.text || ''
+			}
+			if (!retryText) retryText = retryParsed?.choices?.[0]?.message?.content || retryRaw
+			try {
+				json = JSON.parse(retryText)
+			} catch {
+				await (prisma as any).resume.update({
+					where: { id: resume.id },
+					data: { status: 'FAILED', error: 'Invalid JSON from model', resumeData: null }
+				})
+				await (prisma as any).resumeHistory.update({ where: { id: history.id }, data: { status: 'FAILED', rawResponse: retryParsed } })
+				return NextResponse.json({ message: 'Invalid JSON from model' }, { status: 502 })
+			}
+		}
+
+		// Normalize and validate against schema
+		const normalized = normalizeResume(json)
+		const validated = resumeJsonSchema.safeParse(normalized)
+		if (!validated.success) {
 			await (prisma as any).resume.update({
 				where: { id: resume.id },
-				data: { status: 'FAILED', error: 'Invalid JSON from model', resumeData: null }
+				data: { status: 'FAILED', error: `Schema validation failed`, resumeData: normalized }
 			})
 			await (prisma as any).resumeHistory.update({
 				where: { id: history.id },
-				data: { status: 'FAILED', rawResponse: outputText?.slice(0, 4000) }
+				data: { status: 'FAILED', rawResponse: parsedResponse, error: validated.error?.message?.slice(0, 1000) }
 			})
-			return NextResponse.json({ message: 'Invalid JSON from model', raw: outputText?.slice(0, 500) }, { status: 502 })
+			return NextResponse.json(
+				{ message: 'Extraction failed schema validation', details: validated.error.issues.map((i) => i.message) },
+				{ status: 422 }
+			)
 		}
 
 		// Persist result
 		await (prisma as any).resume.update({
 			where: { id: resume.id },
-			data: { status: 'COMPLETED', resumeData: json, error: null }
+			data: { status: 'COMPLETED', resumeData: validated.data, error: null }
 		})
 
 		// History success
