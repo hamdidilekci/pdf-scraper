@@ -53,16 +53,39 @@ Open `http://localhost:3000`.
 
 ## Architecture
 
+### PDF Extraction Method
+
+This application uses OpenAI's Responses API with native PDF handling:
+
+- **Server-side extraction**: The original PDF from Supabase Storage is uploaded to OpenAI Files API (`purpose: user_data`). Then the Responses API is called referencing that file with a strict JSON-extraction prompt (e.g., `gpt-4.1`/`gpt-4o`).
+- **Internal OCR**: OpenAI handles text and image-based PDFs internally (no client-side rendering or custom OCR).
+- **Validation**: The JSON is validated with Zod and stored on the resume record.
+
 ### File Handling Strategy
 - **Files >4MB**: Direct upload to Supabase Storage via signed URLs (bypasses Vercel's 4MB payload limit)
-- **Text Extraction**: Currently uses placeholder text (PDF parsing libraries had webpack compatibility issues)
-- **Production**: Would use cloud PDF services (Adobe PDF Services, AWS Textract, or Google Document AI)
+- **OpenAI Files + Responses**: Server downloads the PDF bytes from Supabase, uploads to OpenAI Files API, then calls Responses API with the uploaded `file_id` and extraction prompt.
+- **Structured Output**: Extracts data into standardized JSON using Zod validation
 
 ### Data Flow
 1. User uploads PDF → Supabase Storage
-2. Server processes PDF → OpenAI extraction
-3. Structured JSON → Database storage
-4. Results displayed in UI
+2. Client calls `/api/extract/responses` with `storagePath`
+3. Server downloads PDF → uploads to OpenAI Files API → calls Responses API with `file_id`
+4. Server parses output JSON → validates → stores in DB
+5. Results displayed in UI
+
+### Cost Considerations
+
+- **OpenAI API costs apply per extraction**
+- **Approximate cost**: $0.01-0.05 per resume (depending on PDF size/complexity)
+- **Model used**: GPT-4o-mini (cost-effective for resume processing)
+- **Token limits**: 4000 max tokens per extraction to balance cost and completeness
+
+### Limits
+
+- **Maximum PDF size**: 10 MB (Supabase Storage upload limit)
+- **Vercel serverless function timeout**: 10 seconds (Hobby plan)
+- **Processing time**: Typically 2-5 seconds per PDF
+- **Concurrent extractions**: Limited by Vercel's function concurrency
 
 ## Tech Stack
 
@@ -70,7 +93,7 @@ Open `http://localhost:3000`.
 - **Authentication**: NextAuth with Credentials provider
 - **Database**: Supabase Postgres with Prisma ORM
 - **File Storage**: Supabase Storage
-- **AI**: OpenAI GPT-4o-mini for text extraction
+- **AI**: OpenAI Files + Responses API (e.g., `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`)
 - **Validation**: Zod for schema validation
 - **UI**: Sonner for toast notifications
 

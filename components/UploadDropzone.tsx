@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { Button } from '@/components/ui/button'
+// PdfClientRenderer removed in Responses flow
 
 // Server-side PDF processing - no client-side extraction needed
 
@@ -15,9 +16,12 @@ export default function UploadDropzone() {
 	const [error, setError] = useState<string | null>(null)
 	const [step, setStep] = useState<Step>('idle')
 	const inputRef = useRef<HTMLInputElement>(null)
+	const [storagePath, setStoragePath] = useState<string | null>(null)
+	const [batchProgress, setBatchProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
 
 	const onSelect = useCallback((f: File) => {
 		setError(null)
+		// file selected
 		if (f.type !== 'application/pdf') {
 			setError('Only PDF files are supported')
 			toast.error('Only PDF files are supported')
@@ -61,41 +65,49 @@ export default function UploadDropzone() {
 		try {
 			setStep('uploading')
 			toast.info('Requesting upload URL…')
+			// requesting signed upload
 			const signedRes = await fetch('/api/storage/signed-url', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ fileName: file.name, contentType: 'application/pdf' })
 			})
-			if (!signedRes.ok) throw new Error('Failed to get upload URL')
+			if (!signedRes.ok) {
+				console.error('[Upload] Failed to get signed upload URL', signedRes.status)
+				throw new Error('Failed to get upload URL')
+			}
 			const { bucket, storagePath, token } = await signedRes.json()
+			// signed upload received
+			setStoragePath(storagePath)
 
 			const supabase = getSupabaseClient()
 			toast.info('Uploading to storage…')
+			// uploading to storage
 			const { error: upErr } = await supabase.storage.from(bucket).uploadToSignedUrl(storagePath, token, file, {
 				contentType: 'application/pdf'
 			})
-			if (upErr) throw upErr
+			if (upErr) {
+				console.error('[Upload] Storage upload failed:', upErr)
+				throw upErr
+			}
+			console.log('[Upload] Storage upload successful')
 
+			// Directly invoke Responses API based extraction
 			setStep('extracting')
-			toast.info('Processing PDF…')
-
-			const extractRes = await fetch('/api/extract', {
+			toast.info('Sending PDF to OpenAI…')
+			const resp = await fetch('/api/extract/responses', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ storagePath })
 			})
-			if (!extractRes.ok) {
-				const errorData = await extractRes.json().catch(() => ({}))
-				throw new Error(errorData.message || 'Extraction failed')
+			if (!resp.ok) {
+				const body = await resp.json().catch(() => ({}))
+				throw new Error(body?.message || 'OpenAI extraction failed')
 			}
-
-			setStep('done')
 			toast.success('Extraction complete')
-
-			// Redirect to resumes page after successful upload
+			setStep('done')
 			setTimeout(() => {
 				window.location.href = '/resumes'
-			}, 2000)
+			}, 1200)
 		} catch (err: any) {
 			setStep('error')
 			const msg = err?.message || 'Unexpected error'
@@ -103,6 +115,8 @@ export default function UploadDropzone() {
 			toast.error(msg)
 		}
 	}, [file])
+
+	// No client-side rendering in Responses flow
 
 	return (
 		<div className="space-y-4">
@@ -142,6 +156,14 @@ export default function UploadDropzone() {
 			)}
 
 			{error && <p className="text-sm text-red-600">{error}</p>}
+
+			{/* Rendering removed */}
+
+			{step === 'extracting' && (
+				<p className="text-sm text-gray-700">
+					Sending to AI… batch {batchProgress.done} / {batchProgress.total}
+				</p>
+			)}
 
 			<div className="flex gap-3">
 				<Button onClick={start} disabled={!canSubmit}>
