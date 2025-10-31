@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
-import { MAX_FILE_SIZE_MB } from '@/lib/constants'
+import { MAX_FILE_SIZE_MB, CREDITS_PER_RESUME } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 
@@ -141,6 +142,23 @@ export default function UploadDropzone() {
 			const extractResult = await resp.json().catch(() => ({}))
 			if (!resp.ok) {
 				const errorMessage = extractResult?.error?.message || 'We could not extract information from your resume. Please try again'
+
+				// If it's a credit error, provide a more helpful message with link
+				if (errorMessage.includes('credits') || errorMessage.includes('enough credits')) {
+					setError(errorMessage)
+					toast.error(errorMessage, {
+						duration: 6000,
+						action: {
+							label: 'Upgrade Plan',
+							onClick: () => {
+								window.location.href = '/settings'
+							}
+						}
+					})
+				} else {
+					setError(errorMessage)
+					toast.error(errorMessage)
+				}
 				throw new Error(errorMessage)
 			}
 
@@ -210,7 +228,16 @@ export default function UploadDropzone() {
 				</div>
 			)}
 
-			{error && <p className="text-sm text-red-600">{error}</p>}
+			{error && (
+				<div className="space-y-2">
+					<p className="text-sm text-red-600">{error}</p>
+					{error.includes('credits') && (
+						<Link href="/settings" className="text-sm text-blue-600 hover:underline block">
+							Go to Settings to upgrade your plan
+						</Link>
+					)}
+				</div>
+			)}
 
 			{(step === 'uploading' || step === 'extracting') && (
 				<div className="space-y-2">

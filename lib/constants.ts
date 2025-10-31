@@ -69,3 +69,18 @@ export const OTP = {
 	RATE_LIMIT_WINDOW_MS: number
 	DIGITS: string
 }
+
+// Credit System Configuration
+export const CREDITS_PER_RESUME = 100
+
+export const PLAN_TYPES = {
+	BASIC: 'BASIC',
+	PRO: 'PRO'
+} as const
+
+export const PLAN_CREDITS = {
+	BASIC: 10000,
+	PRO: 20000
+} as const
+
+export type PlanType = 'BASIC' | 'PRO' | null

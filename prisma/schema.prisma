@@ -9,12 +9,16 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  name           String?
-  email          String?   @unique
-  emailVerified  DateTime?
-  image          String?
-  hashedPassword String?
+  id                  String    @id @default(cuid())
+  name                String?
+  email               String?   @unique
+  emailVerified       DateTime?
+  image               String?
+  hashedPassword      String?
+  credits             Int       @default(0)
+  planType            String?
+  stripeCustomerId    String?   @unique
+  stripeSubscriptionId String?
 
   accounts       Account[]
   sessions       Session[]
@@ -107,5 +111,18 @@ model ResumeHistory {
   rawResponse Json?
 
   resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model StripeWebhookEvent {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  eventType String
+  processed Boolean  @default(false)
+  data      Json
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+  @@index([processed])
+  @@index([eventType])
 }
 

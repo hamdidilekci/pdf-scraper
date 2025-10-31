@@ -4,8 +4,10 @@ import { success } from '@/lib/api-response'
 import { StorageService } from '@/lib/services/storage.service'
 import { ResumeService } from '@/lib/services/resume.service'
 import { ExtractionService } from '@/lib/services/extraction.service'
+import { CreditService } from '@/lib/services/credit.service'
 import { config } from '@/lib/config'
 import { logger } from '@/lib/logger'
+import { CREDITS_PER_RESUME } from '@/lib/constants'
 
 export const runtime = 'nodejs'
 
@@ -28,6 +30,21 @@ export async function POST(req: Request) {
 
 		const resumeService = new ResumeService()
 		const storageService = new StorageService()
+		const creditService = new CreditService()
+
+		// Check credits before extraction
+		try {
+			const hasCredits = await creditService.checkCredits(userId, CREDITS_PER_RESUME)
+			if (!hasCredits) {
+				return badRequest(
+					`You don't have enough credits. Each resume extraction costs ${CREDITS_PER_RESUME} credits. Please upgrade your plan or purchase more credits.`
+				)
+			}
+		} catch (error) {
+			// If credit service fails (e.g., Stripe not configured), log and continue
+			// This allows the app to work without Stripe
+			logger.warn('Credit check failed, proceeding without credit check', { error, userId })
+		}
 
 		// Find resume
 		const resume = await resumeService.findByStoragePath(storagePath, userId)
@@ -46,6 +63,16 @@ export async function POST(req: Request) {
 			fileName: resume.fileName,
 			model: requestedModel
 		})
+
+		// Deduct credits after successful extraction
+		try {
+			await creditService.deductCredits(userId, CREDITS_PER_RESUME)
+			logger.info('Credits deducted after successful extraction', { userId, amount: CREDITS_PER_RESUME })
+		} catch (error) {
+			// Log error but don't fail the request since extraction already succeeded
+			// In production, you might want to handle this differently (e.g., queue for retry)
+			logger.error('Failed to deduct credits after extraction', error, { userId, amount: CREDITS_PER_RESUME })
+		}
 
 		return success({ resumeId: result.resumeId })
 	} catch (error) {

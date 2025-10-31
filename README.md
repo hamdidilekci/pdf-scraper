@@ -111,6 +111,77 @@ This application uses OpenAI's Responses API with native PDF handling:
 └── types/               # TypeScript type definitions
 ```
 
+## Stripe Integration
+
+This application supports an optional Stripe subscription-based credit system. The app runs independently without Stripe configured.
+
+### Stripe Setup
+
+1. **Create a Stripe Test Account**:
+   - Go to [Stripe Dashboard](https://dashboard.stripe.com/test/dashboard)
+   - Navigate to Developers → API keys
+   - Copy your **Secret key** (starts with `sk_test_`) and **Publishable key** (starts with `pk_test_`)
+
+2. **Create Subscription Products**:
+   - Go to Products → Add Product
+   - Create two products:
+     - **Basic Plan**: $10/month, Recurring subscription
+     - **Pro Plan**: $20/month, Recurring subscription
+   - Copy the **Price ID** for each product (starts with `price_`)
+
+3. **Configure Webhooks** (for local development):
+   - Install Stripe CLI: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
+   - Copy the webhook signing secret (starts with `whsec_`)
+
+4. **Environment Variables**:
+   Add to your `.env` file:
+   ```bash
+   # Stripe Configuration (Optional - app works without these)
+   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_WEBHOOK_SECRET=whsec_...
+   STRIPE_PRICE_BASIC=price_...  # Basic plan price ID
+   STRIPE_PRICE_PRO=price_...    # Pro plan price ID
+   NEXT_PUBLIC_STRIPE_PUBLIC_KEY=pk_test_...
+   ```
+
+### Credit System
+
+- **1 resume extraction = 100 credits**
+- **Basic Plan**: 10,000 credits ($10/month)
+- **Pro Plan**: 20,000 credits ($20/month)
+- Credits are deducted after successful extraction
+- Users start with 0 credits (must subscribe to get credits)
+
+### Subscription Flow
+
+1. User visits `/settings` page
+2. Clicks "Subscribe to Basic Plan" or "Upgrade to Pro Plan"
+3. Redirected to Stripe Checkout
+4. After successful payment, webhook adds credits and activates subscription
+5. User can manage billing via "Manage Billing" button (Stripe Customer Portal)
+
+### Webhook Events Handled
+
+- `checkout.session.completed` - Activates subscription and adds credits
+- `customer.subscription.updated` - Handles plan changes (upgrades/downgrades)
+- `customer.subscription.deleted` - Deactivates subscription
+- `invoice.paid` - Adds credits for subscription renewals
+
+### Testing Subscription Flow
+
+1. Use Stripe test card: `4242 4242 4242 4242`
+2. Any future expiry date and CVC
+3. Any postal code
+4. Complete checkout to receive test credits
+
+### Production Deployment
+
+For production:
+1. Use Stripe Live mode keys
+2. Configure webhook endpoint in Stripe Dashboard: `https://yourdomain.com/api/webhooks/stripe`
+3. Copy the production webhook signing secret
+4. Update environment variables with live keys
+
 ## Development Notes
 
 - All routes are protected by default via `middleware.ts`
@@ -118,3 +189,4 @@ This application uses OpenAI's Responses API with native PDF handling:
 - Uses Supabase for both database and file storage
 - OpenAI integration with structured JSON output
 - Comprehensive error handling and user feedback
+- **Stripe integration is optional** - app functions without Stripe configured

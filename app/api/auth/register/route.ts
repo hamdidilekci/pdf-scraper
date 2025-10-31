@@ -37,7 +37,8 @@ export async function POST(request: Request) {
 		await prisma.user.create({
 			data: {
 				email,
-				hashedPassword
+				hashedPassword,
+				credits: 0 // Start with 0 credits - user must subscribe to get credits
 			}
 		})
 

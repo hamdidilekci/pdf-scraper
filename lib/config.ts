@@ -27,6 +27,13 @@ const envSchema = z.object({
 	FROM_EMAIL: z.string().email().optional(),
 	APP_NAME: z.string().optional(),
 
+	// Stripe (optional - only needed for payment integration)
+	STRIPE_SECRET_KEY: z.string().min(1).optional(),
+	STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+	STRIPE_PRICE_BASIC: z.string().optional(),
+	STRIPE_PRICE_PRO: z.string().optional(),
+	NEXT_PUBLIC_STRIPE_PUBLIC_KEY: z.string().min(1).optional(),
+
 	// Node Environment
 	NODE_ENV: z.enum(['development', 'production', 'test']).optional().default('development')
 })
@@ -51,6 +58,11 @@ function validateEnv(): Env {
 			RESEND_API_KEY: process.env.RESEND_API_KEY,
 			FROM_EMAIL: process.env.FROM_EMAIL,
 			APP_NAME: process.env.APP_NAME,
+			STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+			STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+			STRIPE_PRICE_BASIC: process.env.STRIPE_PRICE_BASIC,
+			STRIPE_PRICE_PRO: process.env.STRIPE_PRICE_PRO,
+			NEXT_PUBLIC_STRIPE_PUBLIC_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY,
 			NODE_ENV: process.env.NODE_ENV
 		})
 	} catch (error) {
@@ -89,6 +101,13 @@ export const config = {
 		resendApiKey: env.RESEND_API_KEY || '',
 		fromEmail: env.FROM_EMAIL || '',
 		appName: env.APP_NAME || 'PDF Scraper App'
+	},
+	stripe: {
+		secretKey: env.STRIPE_SECRET_KEY || '',
+		webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
+		priceBasic: env.STRIPE_PRICE_BASIC || '',
+		pricePro: env.STRIPE_PRICE_PRO || '',
+		publicKey: env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || ''
 	},
 	nodeEnv: env.NODE_ENV
 } as const

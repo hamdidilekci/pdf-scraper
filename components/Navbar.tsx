@@ -26,6 +26,9 @@ export default function Navbar() {
 							<Link href="/resumes" className="text-sm text-gray-700 hover:text-gray-900">
 								Resumes
 							</Link>
+							<Link href="/settings" className="text-sm text-gray-700 hover:text-gray-900">
+								Settings
+							</Link>
 						</>
 					)}
 					{status === 'loading' ? (
