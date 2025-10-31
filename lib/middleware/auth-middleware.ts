@@ -1,4 +1,3 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { requireUserId } from '@/lib/prisma-types'
@@ -30,7 +29,7 @@ export async function getAuthenticatedUserId(): Promise<string | null> {
 export async function requireAuthenticatedUser(): Promise<string> {
 	const userId = await getAuthenticatedUserId()
 	if (!userId) {
-		throw new Error('Unauthorized')
+		throw unauthorized()
 	}
 	return userId
 }

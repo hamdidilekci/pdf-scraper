@@ -173,7 +173,6 @@ export class ResumeService {
 		])
 
 		const completedCount = statusBreakdown.find((item) => item.status === 'COMPLETED')?._count || 0
-		const failedCount = statusBreakdown.find((item) => item.status === 'FAILED')?._count || 0
 		const successRate = totalResumes > 0 ? Math.round((completedCount / totalResumes) * 100) : 0
 		const pendingCount = statusBreakdown.find((item) => item.status === 'PENDING')?._count || 0
 
