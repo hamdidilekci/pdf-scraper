@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ResumesDataTable } from '@/components/ResumesDataTable'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 interface ResumeItem {
 	id: string
@@ -25,6 +27,7 @@ export default function ResumesClient() {
 	const { data: session, status } = useSession()
 	const [data, setData] = useState<ResumesData | null>(null)
 	const [loading, setLoading] = useState(true)
+	const [deleting, setDeleting] = useState(false)
 	const [searchTerm, setSearchTerm] = useState('')
 	const [statusFilter, setStatusFilter] = useState('ALL')
 	const [cursor, setCursor] = useState<string | undefined>()
@@ -60,6 +63,10 @@ export default function ResumesClient() {
 		}
 	}, [cursor, statusFilter, searchTerm])
 
+	// Track if this is the initial mount
+	const isInitialMount = useRef(true)
+
+	// Initial fetch on mount
 	useEffect(() => {
 		if (status === 'loading') return
 
@@ -68,28 +75,63 @@ export default function ResumesClient() {
 			return
 		}
 
-		fetchResumes()
+		if (isInitialMount.current) {
+			isInitialMount.current = false
+			fetchResumes()
+		}
 	}, [session, status, fetchResumes])
+
+	// Separate effect for search debouncing (only when searchTerm changes)
+	useEffect(() => {
+		if (isInitialMount.current) return // Skip on initial mount
+		if (status === 'loading' || !session) return
+
+		const timeoutId = setTimeout(() => {
+			setCursor(undefined) // Reset pagination
+			fetchResumes()
+		}, 500) // Debounce search
+
+		return () => clearTimeout(timeoutId)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchTerm, fetchResumes])
+
+	// Effect for status filter changes (immediate, no debounce)
+	useEffect(() => {
+		if (isInitialMount.current) return // Skip on initial mount
+		if (status === 'loading' || !session) return
+
+		setCursor(undefined) // Reset pagination
+		setData(null) // Clear data immediately to prevent showing stale results
+		fetchResumes()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [statusFilter, fetchResumes])
 
 	const handleSearch = (value: string) => {
 		setSearchTerm(value)
-		setCursor(undefined) // Reset pagination
-		// Debounce search
-		const timeoutId = setTimeout(() => {
-			fetchResumes()
-		}, 500)
-		return () => clearTimeout(timeoutId)
 	}
 
 	const handleStatusFilter = (status: string) => {
 		setStatusFilter(status)
-		setCursor(undefined) // Reset pagination
-		fetchResumes()
 	}
 
-	const loadMore = () => {
-		if (data?.hasMore && data?.nextCursor) {
-			setCursor(data.nextCursor)
+	const handleDelete = async (id: string) => {
+		try {
+			setDeleting(true)
+			const response = await fetch(`/api/resumes/${id}`, {
+				method: 'DELETE'
+			})
+
+			const result = await response.json().catch(() => ({}))
+			if (!response.ok) {
+				const errorMsg = result?.error?.message || 'We could not delete the resume. Please try again'
+				throw new Error(errorMsg)
+			}
+
+			// Refresh the list
+			setCursor(undefined) // Reset to first page
+			await fetchResumes()
+		} finally {
+			setDeleting(false)
 		}
 	}
 
@@ -166,80 +208,76 @@ export default function ResumesClient() {
 			</div>
 
 			{/* Results */}
-			<div className="rounded border bg-white p-6">
-				{loading ? (
-					<div className="space-y-3">
-						{[...Array(5)].map((_, i) => (
-							<div key={i} className="flex items-center justify-between py-3">
-								<div className="flex-1">
-									<Skeleton className="h-5 w-48 mb-1" />
+			{loading || deleting ? (
+				<div className="rounded-md border">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>
+									<Skeleton className="h-4 w-24" />
+								</TableHead>
+								<TableHead>
+									<Skeleton className="h-4 w-16" />
+								</TableHead>
+								<TableHead>
 									<Skeleton className="h-4 w-32" />
-								</div>
-								<Skeleton className="h-8 w-16" />
-							</div>
-						))}
-					</div>
-				) : !data?.items || data.items.length === 0 ? (
-					<div className="text-center py-8">
-						<svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-							/>
-						</svg>
-						<p className="text-gray-500 mb-4">
-							{searchTerm || statusFilter !== 'ALL' ? 'No resumes match your filters' : 'No resumes yet. Upload your first PDF.'}
-						</p>
-						{!searchTerm && statusFilter === 'ALL' && (
-							<Link href="/upload" className="text-blue-600 hover:underline">
-								Upload your first resume
-							</Link>
-						)}
-					</div>
-				) : (
-					<>
-						<ul className="divide-y">
-							{data.items.map((item) => (
-								<li key={item.id} className="flex items-center justify-between py-3 text-sm">
-									<div>
-										<p className="font-medium">{item.fileName}</p>
-										<p className="text-gray-600">
-											{new Date(item.uploadedAt).toLocaleString()} ·
-											<span
-												className={`ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-													item.status === 'COMPLETED'
-														? 'bg-green-100 text-green-800'
-														: item.status === 'PENDING'
-														? 'bg-yellow-100 text-yellow-800'
-														: 'bg-red-100 text-red-800'
-												}`}
-											>
-												{item.status}
-											</span>
-										</p>
-									</div>
-									<Link href={`/resumes/${item.id}`}>
-										<Button variant="outline" size="sm">
-											View
-										</Button>
-									</Link>
-								</li>
+								</TableHead>
+								<TableHead>
+									<Skeleton className="h-4 w-20" />
+								</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{[...Array(5)].map((_, i) => (
+								<TableRow key={i}>
+									<TableCell>
+										<Skeleton className="h-5 w-48" />
+									</TableCell>
+									<TableCell>
+										<Skeleton className="h-6 w-20 rounded-full" />
+									</TableCell>
+									<TableCell>
+										<Skeleton className="h-4 w-32" />
+									</TableCell>
+									<TableCell>
+										<Skeleton className="h-8 w-8 rounded-md" />
+									</TableCell>
+								</TableRow>
 							))}
-						</ul>
-
-						{/* Load More Button */}
-						{data.hasMore && (
-							<div className="mt-4 text-center">
-								<Button variant="outline" onClick={loadMore} disabled={loading}>
-									{loading ? 'Loading...' : 'Load More'}
-								</Button>
-							</div>
-						)}
-					</>
-				)}
-			</div>
+						</TableBody>
+					</Table>
+				</div>
+			) : !data?.items || data.items.length === 0 ? (
+				<div className="text-center py-8">
+					<svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							strokeWidth={2}
+							d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+						/>
+					</svg>
+					<p className="text-gray-500 mb-4">
+						{searchTerm || statusFilter !== 'ALL' ? 'No resumes match your filters' : 'No resumes yet. Upload your first PDF.'}
+					</p>
+					{!searchTerm && statusFilter === 'ALL' && (
+						<Link href="/upload" className="text-blue-600 hover:underline">
+							Upload your first resume
+						</Link>
+					)}
+				</div>
+			) : (
+				<ResumesDataTable
+					data={data.items.map((item) => ({
+						id: item.id,
+						fileName: item.fileName,
+						uploadedAt: item.uploadedAt,
+						status: item.status as 'PENDING' | 'COMPLETED' | 'FAILED'
+					}))}
+					onDelete={handleDelete}
+					onRefresh={fetchResumes}
+				/>
+			)}
 		</div>
 	)
 }

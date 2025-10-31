@@ -2,9 +2,9 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { getSupabaseClient } from '@/lib/supabase-client'
 import { MAX_FILE_SIZE_MB } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'done' | 'error'
 
@@ -14,7 +14,7 @@ export default function UploadDropzone() {
 	const [error, setError] = useState<string | null>(null)
 	const [step, setStep] = useState<Step>('idle')
 	const inputRef = useRef<HTMLInputElement>(null)
-	const [batchProgress, setBatchProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
+	const [uploadProgress, setUploadProgress] = useState(0)
 
 	const onSelect = useCallback((f: File) => {
 		setError(null)
@@ -54,6 +54,7 @@ export default function UploadDropzone() {
 		setFile(null)
 		setError(null)
 		setStep('idle')
+		setUploadProgress(0)
 	}, [])
 
 	const canSubmit = useMemo(() => !!file && step !== 'uploading' && step !== 'extracting', [file, step])
@@ -61,10 +62,14 @@ export default function UploadDropzone() {
 	const start = useCallback(async () => {
 		if (!file) return
 		setError(null)
+		setUploadProgress(0)
+
 		try {
 			setStep('uploading')
 			toast.info('Preparing to upload your file...')
-			// requesting signed upload
+
+			// Step 1: Prepare upload URL (0-10%)
+			setUploadProgress(5)
 			const signedRes = await fetch('/api/storage/signed-url', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -72,47 +77,94 @@ export default function UploadDropzone() {
 			})
 			const signedResult = await signedRes.json().catch(() => ({}))
 			if (!signedRes.ok) {
-				console.error('[Upload] Failed to get signed upload URL', signedRes.status)
 				const errorMsg = signedResult?.error?.message || 'Could not prepare file for upload. Please try again'
 				throw new Error(errorMsg)
 			}
-			const { bucket, storagePath, token } = signedResult.data
+			setUploadProgress(10)
 
-			const supabase = getSupabaseClient()
+			const { storagePath, signedUrl } = signedResult.data
+
+			// Step 2: Upload to storage (10-60%)
 			toast.info('Uploading your file...')
-			// uploading to storage
-			const { error: upErr } = await supabase.storage.from(bucket).uploadToSignedUrl(storagePath, token, file, {
-				contentType: 'application/pdf'
-			})
-			if (upErr) {
-				console.error('[Upload] Storage upload failed:', upErr)
-				throw new Error('Upload failed. Please check your internet connection and try again')
-			}
+			setUploadProgress(15)
 
-			// Directly invoke Responses API based extraction
+			// Use XMLHttpRequest for real upload progress tracking
+			await new Promise<void>((resolve, reject) => {
+				const xhr = new XMLHttpRequest()
+
+				xhr.upload.addEventListener('progress', (e) => {
+					if (e.lengthComputable) {
+						// Map upload progress (0-100%) to our range (10-60%)
+						const uploadPercent = (e.loaded / e.total) * 100
+						const mappedProgress = 10 + uploadPercent * 0.5 // 10% to 60%
+						setUploadProgress(Math.round(mappedProgress))
+					}
+				})
+
+				xhr.addEventListener('load', () => {
+					if (xhr.status >= 200 && xhr.status < 300) {
+						setUploadProgress(60)
+						resolve()
+					} else {
+						reject(new Error(`Upload failed with status ${xhr.status}`))
+					}
+				})
+
+				xhr.addEventListener('error', () => {
+					reject(new Error('Upload failed. Please check your internet connection and try again'))
+				})
+
+				xhr.addEventListener('abort', () => {
+					reject(new Error('Upload was cancelled'))
+				})
+
+				xhr.open('PUT', signedUrl)
+				xhr.setRequestHeader('Content-Type', 'application/pdf')
+				xhr.setRequestHeader('x-upsert', 'false')
+
+				// Send file
+				xhr.send(file)
+			})
+
+			// Step 3: Send to OpenAI (60-85%)
 			setStep('extracting')
+			setUploadProgress(65)
 			toast.info('Analyzing your resume with AI...')
+
 			const resp = await fetch('/api/extract/responses', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ storagePath })
 			})
+			setUploadProgress(75)
+
 			const extractResult = await resp.json().catch(() => ({}))
 			if (!resp.ok) {
 				const errorMessage = extractResult?.error?.message || 'We could not extract information from your resume. Please try again'
 				throw new Error(errorMessage)
 			}
+
+			// Step 4: Processing with AI (85-95%)
+			setUploadProgress(85)
+
 			// Verify successful extraction
 			if (extractResult.success === false) {
 				throw new Error(extractResult.error?.message || 'Extraction failed. Please try again')
 			}
+
+			// Step 5: Finalizing (95-100%)
+			setUploadProgress(95)
+			await new Promise((resolve) => setTimeout(resolve, 300))
+			setUploadProgress(100)
+
 			toast.success('Resume processed successfully! Redirecting...')
 			setStep('done')
 			setTimeout(() => {
 				window.location.href = '/resumes'
-			}, 1200)
+			}, 800)
 		} catch (err: any) {
 			setStep('error')
+			setUploadProgress(0)
 			const msg = err?.message || 'An unexpected error occurred. Please try again'
 			setError(msg)
 			toast.error(msg)
@@ -160,12 +212,14 @@ export default function UploadDropzone() {
 
 			{error && <p className="text-sm text-red-600">{error}</p>}
 
-			{/* Rendering removed */}
-
-			{step === 'extracting' && (
-				<p className="text-sm text-gray-700">
-					Sending to AI… batch {batchProgress.done} / {batchProgress.total}
-				</p>
+			{(step === 'uploading' || step === 'extracting') && (
+				<div className="space-y-2">
+					<div className="flex items-center justify-between text-sm">
+						<span className="text-gray-600">{step === 'uploading' ? 'Uploading file...' : 'Processing with AI...'}</span>
+						<span className="font-medium text-gray-900">{uploadProgress}%</span>
+					</div>
+					<Progress value={uploadProgress} className="w-full" />
+				</div>
 			)}
 
 			<div className="flex gap-3">

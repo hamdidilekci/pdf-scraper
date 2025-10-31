@@ -52,7 +52,7 @@ export default async function ResumeDetailPage({ params }: Props) {
 	return (
 		<div className="space-y-6">
 			{/* Breadcrumbs */}
-			<nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
+			<nav className="flex items-center space-x-2 text-sm text-gray-600">
 				<Link href="/" className="hover:text-gray-900">
 					Home
 				</Link>
@@ -65,25 +65,13 @@ export default async function ResumeDetailPage({ params }: Props) {
 				<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
 				</svg>
-				<span className="text-gray-900 font-medium truncate max-w-xs">{item.fileName}</span>
+				<span className="text-gray-900 font-medium truncate max-w-xs">Resume Detail</span>
 			</nav>
 
-			{/* Header with back navigation */}
+			{/* Title and Status */}
 			<div className="flex items-center justify-between">
-				<div className="flex items-center space-x-4">
-					<Link href="/resumes" className="inline-flex items-center text-gray-600 hover:text-gray-900">
-						<svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-						</svg>
-						Back to Resumes
-					</Link>
-					<div className="h-6 w-px bg-gray-300"></div>
-					<div>
-						<h1 className="text-2xl font-semibold">Resume Detail</h1>
-						<p className="text-sm text-gray-600">{item.fileName}</p>
-					</div>
-				</div>
-				<div className="flex items-center space-x-2">
+				<h1 className="text-2xl font-semibold text-gray-900 truncate">{item.fileName}</h1>
+				<div className="flex items-center space-x-2 flex-shrink-0">
 					<span
 						className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
 							item.status === 'COMPLETED'

@@ -184,4 +184,26 @@ export class ResumeService {
 			recentUploads
 		}
 	}
+
+	async delete(id: string, userId: string): Promise<{ storagePath: string }> {
+		// Verify ownership and get storage path
+		const resume = await prisma.resume.findFirst({
+			where: { id, userId },
+			select: { storagePath: true }
+		})
+
+		if (!resume) {
+			logger.warn('Attempted to delete resume that does not exist or belongs to another user', { id, userId })
+			throw new Error('Resume not found or you do not have permission to delete it')
+		}
+
+		// Delete resume (cascades to ResumeHistory via Prisma schema)
+		await prisma.resume.delete({
+			where: { id }
+		})
+
+		logger.info('Resume deleted', { id, userId, storagePath: resume.storagePath })
+
+		return { storagePath: resume.storagePath }
+	}
 }

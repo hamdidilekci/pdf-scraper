@@ -52,10 +52,10 @@ export class StorageService {
 
 		const { data, error } = await this.supabase.storage.from(this.bucket).createSignedUploadUrl(storagePath)
 
-			if (error || !data) {
-				logger.error('Failed to create signed upload URL', error, { storagePath })
-				throw new Error('Unable to prepare file for upload. Please try again')
-			}
+		if (error || !data) {
+			logger.error('Failed to create signed upload URL', error, { storagePath })
+			throw new Error('Unable to prepare file for upload. Please try again')
+		}
 
 		return {
 			bucket: this.bucket,
@@ -92,5 +92,17 @@ export class StorageService {
 		}
 
 		return data.arrayBuffer()
+	}
+
+	async deleteFile(storagePath: string): Promise<void> {
+		const decodedPath = decodeURIComponent(storagePath)
+		const { error } = await this.supabase.storage.from(this.bucket).remove([decodedPath])
+
+		if (error) {
+			logger.error('Failed to delete file from storage', error, { storagePath: decodedPath })
+			// Don't throw - file might not exist, continue with DB deletion
+		} else {
+			logger.info('File deleted from storage', { storagePath: decodedPath })
+		}
 	}
 }
