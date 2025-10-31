@@ -1,20 +1,31 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
+import { requireAuthenticatedUser } from '@/lib/middleware/auth-middleware'
+import { notFound, serverError } from '@/lib/api-errors'
+import { success } from '@/lib/api-response'
+import { ResumeService } from '@/lib/services/resume.service'
+import { logger } from '@/lib/logger'
 
 type Params = { params: { id: string } }
 
 export async function GET(_: Request, { params }: Params) {
-	const session = await getServerSession(authOptions)
-	if (!session || !(session.user as any)?.id) {
-		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+	try {
+		const userId = await requireAuthenticatedUser()
+
+		const resumeService = new ResumeService()
+		const item = await resumeService.findById(params.id, userId)
+
+		if (!item) {
+			return notFound('Resume not found')
+		}
+
+		return success({ item })
+	} catch (error) {
+		if (error instanceof Error && error.message === 'Unauthorized') {
+			const { unauthorized } = await import('@/lib/api-errors')
+			return unauthorized()
+		}
+
+		logger.error('Get resume error', error, { endpoint: '/api/resumes/[id]', resumeId: params.id })
+		return serverError('Failed to get resume')
 	}
-	const userId = (session.user as any).id as string
-	const item = await (prisma as any).resume.findFirst({
-		where: { id: params.id, userId },
-		include: { histories: true }
-	})
-	if (!item) return NextResponse.json({ message: 'Not found' }, { status: 404 })
-	return NextResponse.json({ item })
 }

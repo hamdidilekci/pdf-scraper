@@ -1,7 +1,6 @@
 import OpenAI from 'openai'
+import { config } from './config'
 
 export function getOpenAI() {
-	const apiKey = process.env.OPENAI_API_KEY
-	if (!apiKey) throw new Error('OPENAI_API_KEY is not set')
-	return new OpenAI({ apiKey })
+	return new OpenAI({ apiKey: config.openai.apiKey })
 }

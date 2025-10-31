@@ -4,6 +4,16 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import prisma from './prisma'
 import bcrypt from 'bcrypt'
 
+interface ExtendedJWT {
+	id?: string
+}
+
+interface ExtendedSessionUser {
+	id: string
+	email: string | null
+	name?: string | null
+}
+
 export const authOptions: NextAuthOptions = {
 	adapter: PrismaAdapter(prisma),
 	session: {
@@ -39,13 +49,13 @@ export const authOptions: NextAuthOptions = {
 	callbacks: {
 		async jwt({ token, user }) {
 			if (user) {
-				token.id = (user as any).id
+				;(token as ExtendedJWT).id = user.id
 			}
 			return token
 		},
 		async session({ session, token }) {
-			if (session.user && token?.id) {
-				;(session.user as any).id = token.id as string
+			if (session.user && (token as ExtendedJWT).id) {
+				;(session.user as ExtendedSessionUser).id = (token as ExtendedJWT).id as string
 			}
 			return session
 		}

@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
+import { requireUserId } from '@/lib/prisma-types'
+import { ResumeService } from '@/lib/services/resume.service'
 import JsonViewer from '@/components/JsonViewer'
 import PdfViewer from '@/components/PdfViewer'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 
 type Props = { params: { id: string } }
 
@@ -24,14 +24,9 @@ export default async function ResumeDetailPage({ params }: Props) {
 		)
 	}
 
-	const userId = (session.user as any)?.id as string
-	const item: any = await (prisma as any).resume.findFirst({
-		where: {
-			id: params.id,
-			userId: userId
-		},
-		include: { histories: true }
-	})
+	const userId = requireUserId(session)
+	const resumeService = new ResumeService()
+	const item = await resumeService.findById(params.id, userId)
 
 	if (!item) {
 		return (

@@ -32,7 +32,8 @@ export default function PdfViewer({ storagePath, fileName }: PdfViewerProps) {
 					throw new Error('Failed to get PDF URL')
 				}
 
-				const { signedUrl } = await response.json()
+				const result = await response.json()
+				const signedUrl = result.success ? result.data.signedUrl : result.signedUrl
 				setPdfUrl(signedUrl)
 			} catch (err) {
 				console.error('Error fetching PDF URL:', err)

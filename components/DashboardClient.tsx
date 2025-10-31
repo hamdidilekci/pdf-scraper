@@ -27,8 +27,12 @@ export default function DashboardClient() {
 			try {
 				const response = await fetch('/api/dashboard')
 				if (response.ok) {
-					const dashboardData = await response.json()
-					setData(dashboardData)
+					const result = await response.json()
+					if (result.success && result.data) {
+						setData(result.data)
+					} else {
+						console.error('Invalid response format:', result)
+					}
 				}
 			} catch (error) {
 				console.error('Failed to fetch dashboard data:', error)

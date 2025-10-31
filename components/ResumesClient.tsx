@@ -38,8 +38,12 @@ export default function ResumesClient() {
 
 			const response = await fetch(`/api/resumes?${params.toString()}`)
 			if (response.ok) {
-				const resumesData = await response.json()
-				setData(resumesData)
+				const result = await response.json()
+				if (result.success && result.data) {
+					setData(result.data)
+				} else {
+					console.error('Invalid response format:', result)
+				}
 			}
 		} catch (error) {
 			console.error('Failed to fetch resumes:', error)

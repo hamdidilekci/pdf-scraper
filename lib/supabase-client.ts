@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 
+// Client-side only - cannot use config.ts which validates at module level
 export function getSupabaseClient() {
 	const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 	const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY

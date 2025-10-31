@@ -1,95 +1,76 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { getSupabaseAdmin, getBucketName } from '@/lib/supabase'
-import prisma from '@/lib/prisma'
+import { requireAuthenticatedUser } from '@/lib/middleware/auth-middleware'
+import { badRequest, serverError } from '@/lib/api-errors'
+import { success } from '@/lib/api-response'
+import { StorageService } from '@/lib/services/storage.service'
+import { ResumeService } from '@/lib/services/resume.service'
+import { logger } from '@/lib/logger'
 
-export async function POST(request: Request) {
-	const session = await getServerSession(authOptions)
-	if (!session?.user?.email || !(session.user as any).id) {
-		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-	}
+type Body = {
+	fileName?: string
+	contentType?: string
+	action?: string
+	storagePath?: string
+}
 
+export async function POST(req: Request) {
 	try {
-		const body = await request.json()
-		const fileName: string = body?.fileName
-		const contentType: string = body?.contentType || 'application/pdf'
-		const action: string = body?.action || 'upload'
-		const storagePath: string = body?.storagePath
+		const userId = await requireAuthenticatedUser()
 
-		if (!fileName) return NextResponse.json({ message: 'fileName required' }, { status: 400 })
+		const body = (await req.json()) as Body
+		const { fileName, contentType = 'application/pdf', action = 'upload', storagePath } = body
 
-		const userId = (session.user as any).id as string
-		const bucket = getBucketName()
-		const supabase = getSupabaseAdmin()
+		if (!fileName) {
+			return badRequest('fileName required')
+		}
+
+		const storageService = new StorageService()
 
 		// Handle download requests
 		if (action === 'download' && storagePath) {
-			// Decode the storage path to handle URL-encoded characters
-			const decodedStoragePath = decodeURIComponent(storagePath)
-			const { data, error } = await supabase.storage.from(bucket).createSignedUrl(decodedStoragePath, 3600) // 1 hour expiry
-
-			if (error || !data) {
-				console.error('Download signed URL error:', error)
-				console.error('Storage path that failed:', decodedStoragePath)
-				return NextResponse.json({ message: 'Failed to create download URL' }, { status: 500 })
-			}
-
-			return NextResponse.json({
-				signedUrl: data.signedUrl
-			})
+			const result = await storageService.createDownloadUrl({ storagePath })
+			return success({ signedUrl: result.signedUrl })
 		}
 
-		// Handle upload requests (existing logic)
-		// Create a safe storage path using a hash-based filename to avoid special character issues
-		const crypto = require('crypto')
-		const fileExtension = fileName.split('.').pop() || 'pdf'
-		const fileNameHash = crypto.createHash('md5').update(fileName).digest('hex').substring(0, 8)
-		const safeFileName = `${fileNameHash}.${fileExtension}`
-		const path = `${userId}/${Date.now()}-${safeFileName}`
+		// Handle upload requests
+		const result = await storageService.createUploadUrl({
+			userId,
+			fileName,
+			contentType
+		})
 
-		// Store the original filename mapping in the database for later retrieval
-		// We'll create a temporary record that will be updated during extraction
+		// Create resume record
+		const resumeService = new ResumeService()
 		try {
-			await (prisma as any).resume.create({
-				data: {
-					userId,
-					fileName: fileName, // Store original filename
-					storagePath: path,
-					status: 'PENDING'
-				}
+			await resumeService.create({
+				userId,
+				fileName,
+				storagePath: result.storagePath
 			})
 		} catch (dbError) {
-			console.error('Failed to create resume record:', dbError)
+			logger.warn('Failed to create resume record (continuing)', {
+				userId,
+				fileName,
+				storagePath: result.storagePath,
+				error: dbError instanceof Error ? dbError.message : String(dbError)
+			})
 			// Continue with upload even if DB fails
 		}
 
-		// Ensure bucket exists (idempotent)
-		try {
-			await supabase.storage.createBucket(bucket, { public: false })
-		} catch (e: any) {
-			const msg = String(e?.message || e || '')
-			if (!msg.toLowerCase().includes('exists')) {
-				console.error('Bucket create error:', e)
-				return NextResponse.json({ message: 'Bucket unavailable' }, { status: 500 })
-			}
-		}
-
-		const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(path)
-		if (error || !data) {
-			console.error('Signed URL error:', error)
-			return NextResponse.json({ message: 'Failed to create signed upload' }, { status: 500 })
-		}
-
-		return NextResponse.json({
-			bucket,
-			storagePath: path,
-			signedUrl: data.signedUrl,
-			token: data.token,
-			contentType
+		return success({
+			bucket: result.bucket,
+			storagePath: result.storagePath,
+			signedUrl: result.signedUrl,
+			token: result.token,
+			contentType: result.contentType
 		})
-	} catch (err) {
-		console.error('signed-url handler error:', err)
-		return NextResponse.json({ message: 'Server error' }, { status: 500 })
+	} catch (error) {
+		if (error instanceof Error && error.message === 'Unauthorized') {
+			const { unauthorized } = await import('@/lib/api-errors')
+			return unauthorized()
+		}
+
+		logger.error('Storage signed URL error', error, { endpoint: '/api/storage/signed-url' })
+		return serverError('Failed to create signed URL')
 	}
 }

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import bcrypt from 'bcrypt'
+import { badRequest, conflict, serverError } from '@/lib/api-errors'
+import { created } from '@/lib/api-response'
+import { logger } from '@/lib/logger'
 
 const schema = z.object({
 	email: z.string().email(),
@@ -13,14 +16,16 @@ export async function POST(request: Request) {
 	try {
 		const json = await request.json()
 		const parsed = schema.safeParse(json)
+
 		if (!parsed.success) {
-			return NextResponse.json({ message: 'Invalid input' }, { status: 400 })
+			return badRequest('Invalid input', parsed.error.errors)
 		}
 
 		const email = parsed.data.email.toLowerCase()
 		const exists = await prisma.user.findUnique({ where: { email } })
+
 		if (exists) {
-			return NextResponse.json({ message: 'Email already in use' }, { status: 409 })
+			return conflict('Email already in use')
 		}
 
 		const hashedPassword = await bcrypt.hash(parsed.data.password, 10)
@@ -32,8 +37,9 @@ export async function POST(request: Request) {
 			}
 		})
 
-		return NextResponse.json({ ok: true }, { status: 201 })
-	} catch (err) {
-		return NextResponse.json({ message: 'Server error' }, { status: 500 })
+		return created({ ok: true })
+	} catch (error) {
+		logger.error('Registration error', error, { endpoint: '/api/auth/register' })
+		return serverError('Registration failed')
 	}
 }

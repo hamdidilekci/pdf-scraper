@@ -75,7 +75,8 @@ export default function UploadDropzone() {
 				console.error('[Upload] Failed to get signed upload URL', signedRes.status)
 				throw new Error('Failed to get upload URL')
 			}
-			const { bucket, storagePath, token } = await signedRes.json()
+			const signedResult = await signedRes.json()
+			const { bucket, storagePath, token } = signedResult.success ? signedResult.data : signedResult
 			// signed upload received
 			setStoragePath(storagePath)
 
@@ -99,9 +100,14 @@ export default function UploadDropzone() {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ storagePath })
 			})
+			const extractResult = await resp.json().catch(() => ({}))
 			if (!resp.ok) {
-				const body = await resp.json().catch(() => ({}))
-				throw new Error(body?.message || 'OpenAI extraction failed')
+				const errorMessage = extractResult?.error?.message || extractResult?.message || 'OpenAI extraction failed'
+				throw new Error(errorMessage)
+			}
+			// Verify successful extraction
+			if (extractResult.success === false) {
+				throw new Error(extractResult.error?.message || 'Extraction failed')
 			}
 			toast.success('Extraction complete')
 			setStep('done')
