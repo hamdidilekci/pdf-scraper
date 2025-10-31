@@ -15,7 +15,7 @@ export async function GET(_: Request, { params }: Params) {
 		const item = await resumeService.findById(params.id, userId)
 
 		if (!item) {
-			return notFound('Resume not found')
+			return notFound('This resume could not be found or you do not have permission to view it')
 		}
 
 		return success({ item })
@@ -26,6 +26,6 @@ export async function GET(_: Request, { params }: Params) {
 		}
 
 		logger.error('Get resume error', error, { endpoint: '/api/resumes/[id]', resumeId: params.id })
-		return serverError('Failed to get resume')
+		return serverError('We could not load this resume. Please try again')
 	}
 }

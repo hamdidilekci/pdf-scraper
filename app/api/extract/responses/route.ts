@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 		const requestedModel = (body?.model || config.openai.model).trim()
 
 		if (!storagePath) {
-			return badRequest('storagePath required')
+			return badRequest('Resume file information is missing. Please try uploading again')
 		}
 
 		const resumeService = new ResumeService()
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 		// Find resume
 		const resume = await resumeService.findByStoragePath(storagePath, userId)
 		if (!resume) {
-			return notFound('Resume not found')
+			return notFound('The resume you are trying to process could not be found. Please try uploading again')
 		}
 
 		// Download PDF
@@ -56,6 +56,21 @@ export async function POST(req: Request) {
 		}
 
 		logger.error('Resume extraction error', error, { endpoint: '/api/extract/responses' })
-		return serverError('Failed to extract resume', error instanceof Error ? error.message : undefined)
+
+		// Provide user-friendly error messages
+		let userMessage = 'We could not extract information from your resume. Please try again'
+		if (error instanceof Error) {
+			if (error.message.includes('Unauthorized')) {
+				userMessage = 'Please sign in to continue'
+			} else if (error.message.includes('download') || error.message.includes('Failed to download')) {
+				userMessage = 'We could not access your uploaded file. Please try uploading again'
+			} else if (error.message.includes('OpenAI')) {
+				userMessage = 'We encountered an issue processing your resume with AI. Please try again in a moment'
+			} else if (error.message.includes('Schema validation')) {
+				userMessage = 'We could not extract all required information from your resume. Please ensure your resume is clear and readable'
+			}
+		}
+
+		return serverError(userMessage)
 	}
 }

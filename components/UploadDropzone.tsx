@@ -3,10 +3,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { getSupabaseClient } from '@/lib/supabase-client'
+import { MAX_FILE_SIZE_MB } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
-// PdfClientRenderer removed in Responses flow
-
-// Server-side PDF processing - no client-side extraction needed
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'done' | 'error'
 
@@ -16,25 +14,26 @@ export default function UploadDropzone() {
 	const [error, setError] = useState<string | null>(null)
 	const [step, setStep] = useState<Step>('idle')
 	const inputRef = useRef<HTMLInputElement>(null)
-	const [storagePath, setStoragePath] = useState<string | null>(null)
 	const [batchProgress, setBatchProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
 
 	const onSelect = useCallback((f: File) => {
 		setError(null)
 		// file selected
 		if (f.type !== 'application/pdf') {
-			setError('Only PDF files are supported')
-			toast.error('Only PDF files are supported')
+			const errorMsg = 'Please select a PDF file. Other file types are not supported'
+			setError(errorMsg)
+			toast.error(errorMsg)
 			return
 		}
 		const maxBytes = 10 * 1024 * 1024
 		if (f.size > maxBytes) {
-			setError('File exceeds 10MB limit')
-			toast.error('File exceeds 10MB limit')
+			const errorMsg = `File size (${(f.size / (1024 * 1024)).toFixed(1)}MB) exceeds the ${MAX_FILE_SIZE_MB}MB limit. Please choose a smaller file`
+			setError(errorMsg)
+			toast.error(errorMsg)
 			return
 		}
 		setFile(f)
-		toast.success('File ready to upload')
+		toast.success('PDF file selected and ready to upload')
 	}, [])
 
 	const onDrop = useCallback(
@@ -64,37 +63,35 @@ export default function UploadDropzone() {
 		setError(null)
 		try {
 			setStep('uploading')
-			toast.info('Requesting upload URL…')
+			toast.info('Preparing to upload your file...')
 			// requesting signed upload
 			const signedRes = await fetch('/api/storage/signed-url', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ fileName: file.name, contentType: 'application/pdf' })
 			})
+			const signedResult = await signedRes.json().catch(() => ({}))
 			if (!signedRes.ok) {
 				console.error('[Upload] Failed to get signed upload URL', signedRes.status)
-				throw new Error('Failed to get upload URL')
+				const errorMsg = signedResult?.error?.message || 'Could not prepare file for upload. Please try again'
+				throw new Error(errorMsg)
 			}
-			const signedResult = await signedRes.json()
-			const { bucket, storagePath, token } = signedResult.success ? signedResult.data : signedResult
-			// signed upload received
-			setStoragePath(storagePath)
+			const { bucket, storagePath, token } = signedResult.data
 
 			const supabase = getSupabaseClient()
-			toast.info('Uploading to storage…')
+			toast.info('Uploading your file...')
 			// uploading to storage
 			const { error: upErr } = await supabase.storage.from(bucket).uploadToSignedUrl(storagePath, token, file, {
 				contentType: 'application/pdf'
 			})
 			if (upErr) {
 				console.error('[Upload] Storage upload failed:', upErr)
-				throw upErr
+				throw new Error('Upload failed. Please check your internet connection and try again')
 			}
-			console.log('[Upload] Storage upload successful')
 
 			// Directly invoke Responses API based extraction
 			setStep('extracting')
-			toast.info('Sending PDF to OpenAI…')
+			toast.info('Analyzing your resume with AI...')
 			const resp = await fetch('/api/extract/responses', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -102,21 +99,21 @@ export default function UploadDropzone() {
 			})
 			const extractResult = await resp.json().catch(() => ({}))
 			if (!resp.ok) {
-				const errorMessage = extractResult?.error?.message || extractResult?.message || 'OpenAI extraction failed'
+				const errorMessage = extractResult?.error?.message || 'We could not extract information from your resume. Please try again'
 				throw new Error(errorMessage)
 			}
 			// Verify successful extraction
 			if (extractResult.success === false) {
-				throw new Error(extractResult.error?.message || 'Extraction failed')
+				throw new Error(extractResult.error?.message || 'Extraction failed. Please try again')
 			}
-			toast.success('Extraction complete')
+			toast.success('Resume processed successfully! Redirecting...')
 			setStep('done')
 			setTimeout(() => {
 				window.location.href = '/resumes'
 			}, 1200)
 		} catch (err: any) {
 			setStep('error')
-			const msg = err?.message || 'Unexpected error'
+			const msg = err?.message || 'An unexpected error occurred. Please try again'
 			setError(msg)
 			toast.error(msg)
 		}
@@ -196,8 +193,12 @@ export default function UploadDropzone() {
 				)}
 			</div>
 
-			{step === 'done' && <p className="text-sm text-green-700">Upload and extraction complete. You can view it in your dashboard.</p>}
-			{step === 'error' && <p className="text-sm text-red-700">An error occurred. Backend endpoints may not be ready yet.</p>}
+			{step === 'done' && <p className="text-sm text-green-700">✓ Your resume has been uploaded and processed successfully!</p>}
+			{step === 'error' && (
+				<p className="text-sm text-red-700">
+					We encountered an issue processing your resume. Please try again or contact support if the problem persists.
+				</p>
+			)}
 		</div>
 	)
 }

@@ -55,8 +55,10 @@ export class ExtractionService {
 			const validated = resumeJsonSchema.safeParse(normalized)
 
 			if (!validated.success) {
-				await this.markFailed(resumeId, history.id, normalized, rawResponse, validated.error.message)
-				throw new Error('Schema validation failed')
+				const validationError =
+					'We could not extract all required information from your resume. Please ensure your resume is clear and contains the necessary details'
+				await this.markFailed(resumeId, history.id, normalized, rawResponse, validationError)
+				throw new Error(validationError)
 			}
 
 			// Step 5: Persist success
@@ -106,7 +108,7 @@ export class ExtractionService {
 
 		if (!response.ok) {
 			logger.error('OpenAI Files API error', new Error(raw), { status: response.status })
-			throw new Error(`OpenAI Files API error: ${response.status}`)
+			throw new Error('Unable to process your resume file. Please try again')
 		}
 
 		let fileId: string = ''
@@ -120,7 +122,7 @@ export class ExtractionService {
 
 		if (!fileId) {
 			logger.error('Failed to obtain file ID from OpenAI', undefined, { raw: raw.slice(0, 200) })
-			throw new Error('Failed to obtain file ID from OpenAI')
+			throw new Error('Unable to prepare your resume for processing. Please try again')
 		}
 
 		return fileId
@@ -155,7 +157,7 @@ export class ExtractionService {
 
 		if (!response.ok) {
 			logger.error('OpenAI Responses API error', new Error(raw), { status: response.status })
-			throw new Error(`OpenAI Responses API error: ${response.status}`)
+			throw new Error('Unable to analyze your resume. Please try again')
 		}
 
 		let parsed: any
@@ -238,7 +240,7 @@ export class ExtractionService {
 			return JSON.parse(retryText)
 		} catch {
 			logger.error('Retry JSON parse also failed', undefined, { retryText: retryText.slice(0, 200) })
-			throw new Error('Invalid JSON from model after retry')
+			throw new Error('We could not parse the extracted information. Please try again with a clearer resume')
 		}
 	}
 

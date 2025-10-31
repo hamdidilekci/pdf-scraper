@@ -28,16 +28,16 @@ export default function PdfViewer({ storagePath, fileName }: PdfViewerProps) {
 					})
 				})
 
+				const result = await response.json().catch(() => ({}))
 				if (!response.ok) {
-					throw new Error('Failed to get PDF URL')
+					const errorMsg = result?.error?.message || 'We could not load the PDF. Please try again'
+					throw new Error(errorMsg)
 				}
-
-				const result = await response.json()
-				const signedUrl = result.success ? result.data.signedUrl : result.signedUrl
-				setPdfUrl(signedUrl)
+				setPdfUrl(result.data.signedUrl)
 			} catch (err) {
 				console.error('Error fetching PDF URL:', err)
-				setError('Failed to load PDF')
+				const errorMsg = err instanceof Error ? err.message : 'We could not load the PDF preview. Please try again'
+				setError(errorMsg)
 			} finally {
 				setLoading(false)
 			}
@@ -83,9 +83,9 @@ export default function PdfViewer({ storagePath, fileName }: PdfViewerProps) {
 							d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z"
 						/>
 					</svg>
-					<p className="text-gray-600 mb-4">{error || 'PDF not found'}</p>
+					<p className="text-gray-600 mb-4">{error || 'The PDF file could not be found or loaded'}</p>
 					<button onClick={() => window.location.reload()} className="text-blue-600 hover:underline text-sm">
-						Try again
+						Try Again
 					</button>
 				</div>
 			</div>

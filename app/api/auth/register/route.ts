@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import bcrypt from 'bcrypt'
@@ -8,8 +7,7 @@ import { logger } from '@/lib/logger'
 
 const schema = z.object({
 	email: z.string().email(),
-	password: z.string().min(8),
-	name: z.string().min(1).optional()
+	password: z.string().min(8)
 })
 
 export async function POST(request: Request) {
@@ -18,21 +16,27 @@ export async function POST(request: Request) {
 		const parsed = schema.safeParse(json)
 
 		if (!parsed.success) {
-			return badRequest('Invalid input', parsed.error.errors)
+			const errorDetails = parsed.error.errors.map((err) => {
+				if (err.path.includes('email')) return 'Please enter a valid email address'
+				if (err.path.includes('password')) return 'Password must be at least 8 characters long'
+				return err.message
+			})
+			return badRequest(errorDetails.join('. '), parsed.error.errors)
 		}
 
 		const email = parsed.data.email.toLowerCase()
 		const exists = await prisma.user.findUnique({ where: { email } })
 
 		if (exists) {
-			return conflict('Email already in use')
+			logger.warn('Email already in use', { email })
+			return conflict('An account with this email already exists. Please sign in instead')
 		}
 
 		const hashedPassword = await bcrypt.hash(parsed.data.password, 10)
+		logger.info('Creating user', { email })
 		await prisma.user.create({
 			data: {
 				email,
-				name: parsed.data.name || null,
 				hashedPassword
 			}
 		})
@@ -40,6 +44,6 @@ export async function POST(request: Request) {
 		return created({ ok: true })
 	} catch (error) {
 		logger.error('Registration error', error, { endpoint: '/api/auth/register' })
-		return serverError('Registration failed')
+		return serverError('We could not create your account right now. Please try again')
 	}
 }

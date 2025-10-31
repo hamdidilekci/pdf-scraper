@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { signIn } from 'next-auth/react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,12 +52,15 @@ export default function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(values)
 				})
+				const body = await res.json().catch(() => ({}))
 				if (!res.ok) {
-					const body = await res.json().catch(() => ({}))
-					throw new Error(body?.message || 'Registration failed')
+					const errorMessage = body?.error?.message || 'We could not create your account. Please try again'
+					toast.error(errorMessage)
+					throw new Error(errorMessage)
 				}
 
 				// Auto sign in after successful registration
+				toast.success('Account created successfully! Redirecting...')
 				const signInRes = await signIn('credentials', {
 					email: values.email,
 					password: values.password,
@@ -69,6 +73,7 @@ export default function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 					return
 				}
 
+				toast.success('Signed in successfully!')
 				router.replace('/')
 				return
 			}
@@ -79,11 +84,18 @@ export default function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 				redirect: false
 			})
 			if (!res || res.error) {
-				throw new Error(res?.error || 'Invalid credentials')
+				const errorMsg =
+					res?.error === 'CredentialsSignin'
+						? 'Invalid email or password. Please check your credentials and try again'
+						: res?.error || 'We could not sign you in. Please try again'
+				toast.error(errorMsg)
+				throw new Error(errorMsg)
 			}
+			toast.success('Welcome back! Redirecting to your dashboard...')
 			router.replace('/')
 		} catch (err: any) {
-			setError(err.message || 'Something went wrong')
+			const errorMessage = err.message || 'An unexpected error occurred. Please try again'
+			setError(errorMessage)
 		} finally {
 			setLoading(false)
 		}

@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 		const { fileName, contentType = 'application/pdf', action = 'upload', storagePath } = body
 
 		if (!fileName) {
-			return badRequest('fileName required')
+			return badRequest('Please select a file to upload')
 		}
 
 		const storageService = new StorageService()
@@ -71,6 +71,17 @@ export async function POST(req: Request) {
 		}
 
 		logger.error('Storage signed URL error', error, { endpoint: '/api/storage/signed-url' })
-		return serverError('Failed to create signed URL')
+
+		// Provide user-friendly error messages
+		let userMessage = 'We could not prepare your file for upload. Please try again'
+		if (error instanceof Error) {
+			if (error.message.includes('Unauthorized')) {
+				userMessage = 'Please sign in to upload files'
+			} else if (error.message.includes('Bucket')) {
+				userMessage = 'Our storage system is unavailable. Please try again later'
+			}
+		}
+
+		return serverError(userMessage)
 	}
 }

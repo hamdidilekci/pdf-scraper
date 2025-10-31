@@ -52,10 +52,10 @@ export class StorageService {
 
 		const { data, error } = await this.supabase.storage.from(this.bucket).createSignedUploadUrl(storagePath)
 
-		if (error || !data) {
-			logger.error('Failed to create signed upload URL', error, { storagePath })
-			throw new Error('Failed to create signed upload URL')
-		}
+			if (error || !data) {
+				logger.error('Failed to create signed upload URL', error, { storagePath })
+				throw new Error('Unable to prepare file for upload. Please try again')
+			}
 
 		return {
 			bucket: this.bucket,
@@ -74,7 +74,7 @@ export class StorageService {
 
 		if (error || !data) {
 			logger.error('Failed to create download URL', error, { storagePath: decodedPath })
-			throw new Error('Failed to create download URL')
+			throw new Error('Unable to load the PDF file. Please try again')
 		}
 
 		return {
@@ -88,7 +88,7 @@ export class StorageService {
 
 		if (error || !data) {
 			logger.error('Failed to download file', error, { storagePath: decodedPath })
-			throw new Error('Failed to download file')
+			throw new Error('Unable to access the uploaded file. Please try uploading again')
 		}
 
 		return data.arrayBuffer()

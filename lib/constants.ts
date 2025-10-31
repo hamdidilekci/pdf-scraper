@@ -32,17 +32,17 @@ export const HTTP_STATUS = {
 
 // Error Messages
 export const ERROR_MESSAGES = {
-	UNAUTHORIZED: 'Unauthorized',
-	NOT_FOUND: 'Not found',
-	BAD_REQUEST: 'Bad request',
-	SERVER_ERROR: 'Internal server error',
-	VALIDATION_FAILED: 'Validation failed',
-	FILE_TOO_LARGE: `File exceeds ${MAX_FILE_SIZE_MB}MB limit`,
-	UNSUPPORTED_FILE_TYPE: 'Only PDF files are supported',
-	OPENAI_ERROR: 'OpenAI API error',
-	STORAGE_ERROR: 'Storage operation failed',
-	INVALID_JSON: 'Invalid JSON response',
-	SCHEMA_VALIDATION_FAILED: 'Schema validation failed',
+	UNAUTHORIZED: 'Please sign in to continue',
+	NOT_FOUND: 'The requested resource could not be found',
+	BAD_REQUEST: 'Invalid request. Please check your input and try again',
+	SERVER_ERROR: 'Something went wrong on our end. Please try again later',
+	VALIDATION_FAILED: 'The information you provided is invalid. Please check and try again',
+	FILE_TOO_LARGE: `File size must be less than ${MAX_FILE_SIZE_MB}MB. Please choose a smaller file`,
+	UNSUPPORTED_FILE_TYPE: 'Only PDF files are supported. Please select a PDF file',
+	OPENAI_ERROR: 'We encountered an issue processing your resume. Please try again',
+	STORAGE_ERROR: 'Unable to save your file. Please try again',
+	INVALID_JSON: 'We received an unexpected response. Please try again',
+	SCHEMA_VALIDATION_FAILED: 'We could not extract all required information from your resume. Please try again with a clearer document',
 	MISSING_ENV_VAR: 'Required environment variable is missing'
 } as const
 

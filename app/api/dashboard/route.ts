@@ -20,6 +20,6 @@ export async function GET() {
 		}
 
 		logger.error('Dashboard API error', error, { endpoint: '/api/dashboard' })
-		return serverError('Failed to fetch dashboard stats')
+		return serverError('We could not load your dashboard statistics. Please refresh the page')
 	}
 }

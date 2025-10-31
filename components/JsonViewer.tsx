@@ -17,9 +17,9 @@ export default function JsonViewer({ data, loading = false }: JsonViewerProps) {
 	const onCopy = useCallback(async () => {
 		try {
 			await navigator.clipboard.writeText(json)
-			toast.success('Copied JSON')
+			toast.success('Resume data copied to clipboard')
 		} catch {
-			toast.error('Copy failed')
+			toast.error('Could not copy to clipboard. Please try again')
 		}
 	}, [json])
 
@@ -34,9 +34,9 @@ export default function JsonViewer({ data, loading = false }: JsonViewerProps) {
 			a.click()
 			a.remove()
 			URL.revokeObjectURL(url)
-			toast.success('Downloaded JSON')
+			toast.success('Resume data downloaded successfully')
 		} catch {
-			toast.error('Download failed')
+			toast.error('Download failed. Please try again')
 		}
 	}, [json])
 

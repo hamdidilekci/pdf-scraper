@@ -32,6 +32,6 @@ export async function GET(req: Request) {
 		}
 
 		logger.error('List resumes error', error, { endpoint: '/api/resumes' })
-		return serverError('Failed to list resumes')
+		return serverError('We could not load your resumes. Please refresh the page')
 	}
 }

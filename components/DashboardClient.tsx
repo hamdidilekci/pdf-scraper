@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -26,16 +27,23 @@ export default function DashboardClient() {
 		const fetchDashboardData = async () => {
 			try {
 				const response = await fetch('/api/dashboard')
+				const result = await response.json().catch(() => ({}))
 				if (response.ok) {
-					const result = await response.json()
 					if (result.success && result.data) {
 						setData(result.data)
 					} else {
-						console.error('Invalid response format:', result)
+						// Handle error response
+						const errorMsg = result?.error?.message || 'We could not load your dashboard data. Please refresh the page'
+						throw new Error(errorMsg)
 					}
+				} else {
+					// Handle HTTP error
+					const errorMsg = result?.error?.message || 'We could not load your dashboard. Please try again'
+					throw new Error(errorMsg)
 				}
 			} catch (error) {
-				console.error('Failed to fetch dashboard data:', error)
+				const errorMessage = error instanceof Error ? error.message : 'We could not load your dashboard. Please refresh the page'
+				toast.error(errorMessage)
 			} finally {
 				setLoading(false)
 			}
@@ -113,8 +121,8 @@ export default function DashboardClient() {
 						/>
 					</svg>
 				</div>
-				<h1 className="text-2xl font-semibold text-gray-900 mb-4">Error Loading Dashboard</h1>
-				<p className="text-gray-600 mb-6">Unable to load dashboard data. Please try again.</p>
+				<h1 className="text-2xl font-semibold text-gray-900 mb-4">Unable to Load Dashboard</h1>
+				<p className="text-gray-600 mb-6">We encountered an issue loading your dashboard. Please try refreshing the page.</p>
 				<div className="flex flex-col sm:flex-row gap-3 justify-center">
 					<Button onClick={() => window.location.reload()}>Refresh Page</Button>
 					<Button

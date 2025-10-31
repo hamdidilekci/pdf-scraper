@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,16 +38,23 @@ export default function ResumesClient() {
 			if (searchTerm) params.set('search', searchTerm)
 
 			const response = await fetch(`/api/resumes?${params.toString()}`)
+			const result = await response.json().catch(() => ({}))
 			if (response.ok) {
-				const result = await response.json()
 				if (result.success && result.data) {
 					setData(result.data)
 				} else {
-					console.error('Invalid response format:', result)
+					// Handle error response
+					const errorMsg = result?.error?.message || 'We could not load your resumes. Please refresh the page'
+					throw new Error(errorMsg)
 				}
+			} else {
+				// Handle HTTP error
+				const errorMsg = result?.error?.message || 'We could not load your resumes. Please try again'
+				throw new Error(errorMsg)
 			}
 		} catch (error) {
-			console.error('Failed to fetch resumes:', error)
+			const errorMessage = error instanceof Error ? error.message : 'We could not load your resumes. Please refresh the page'
+			toast.error(errorMessage)
 		} finally {
 			setLoading(false)
 		}
@@ -118,8 +126,8 @@ export default function ResumesClient() {
 	if (!session) {
 		return (
 			<div className="text-center py-12">
-				<h1 className="text-2xl font-semibold text-gray-900 mb-4">Access Denied</h1>
-				<p className="text-gray-600 mb-6">Please sign in to view your resumes.</p>
+				<h1 className="text-2xl font-semibold text-gray-900 mb-4">Sign In Required</h1>
+				<p className="text-gray-600 mb-6">Please sign in to view and manage your resumes.</p>
 				<Link href="/sign-in" className="text-blue-600 hover:underline">
 					Sign in
 				</Link>
