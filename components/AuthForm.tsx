@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -115,6 +116,13 @@ export default function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 						<Input id="password" type="password" placeholder="••••••••" {...register('password')} />
 						{errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
 					</div>
+					{mode === 'sign-in' && (
+						<div className="text-right">
+							<Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+								Forgot password?
+							</Link>
+						</div>
+					)}
 					{error && <p className="text-sm text-red-600">{error}</p>}
 					<Button type="submit" disabled={loading} className="w-full">
 						{loading && (

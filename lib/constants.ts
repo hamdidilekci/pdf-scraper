@@ -52,3 +52,20 @@ export const MAX_PAGE_LIMIT = 100
 
 // OpenAI Files API Purpose
 export const OPENAI_FILE_PURPOSE = 'user_data' as const
+
+// OTP Configuration
+export const OTP = {
+	LENGTH: 6,
+	EXPIRY_MINUTES: 10,
+	MAX_ATTEMPTS: 5,
+	MAX_REQUESTS_PER_HOUR: 3,
+	RATE_LIMIT_WINDOW_MS: 60 * 60 * 1000, // 1 hour
+	DIGITS: '0123456789'
+} as const satisfies {
+	LENGTH: number
+	EXPIRY_MINUTES: number
+	MAX_ATTEMPTS: number
+	MAX_REQUESTS_PER_HOUR: number
+	RATE_LIMIT_WINDOW_MS: number
+	DIGITS: string
+}

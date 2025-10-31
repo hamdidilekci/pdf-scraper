@@ -22,6 +22,11 @@ const envSchema = z.object({
 	NEXTAUTH_SECRET: z.string().min(1),
 	NEXTAUTH_URL: z.string().url(),
 
+	// Email Service (optional - only needed for forgot password)
+	RESEND_API_KEY: z.string().min(1).optional(),
+	FROM_EMAIL: z.string().email().optional(),
+	APP_NAME: z.string().optional(),
+
 	// Node Environment
 	NODE_ENV: z.enum(['development', 'production', 'test']).optional().default('development')
 })
@@ -43,6 +48,9 @@ function validateEnv(): Env {
 			OPENAI_RESPONSES_MODEL: process.env.OPENAI_RESPONSES_MODEL,
 			NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
 			NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+			RESEND_API_KEY: process.env.RESEND_API_KEY,
+			FROM_EMAIL: process.env.FROM_EMAIL,
+			APP_NAME: process.env.APP_NAME,
 			NODE_ENV: process.env.NODE_ENV
 		})
 	} catch (error) {
@@ -76,6 +84,11 @@ export const config = {
 	nextAuth: {
 		secret: env.NEXTAUTH_SECRET,
 		url: env.NEXTAUTH_URL
+	},
+	email: {
+		resendApiKey: env.RESEND_API_KEY || '',
+		fromEmail: env.FROM_EMAIL || '',
+		appName: env.APP_NAME || 'PDF Scraper App'
 	},
 	nodeEnv: env.NODE_ENV
 } as const

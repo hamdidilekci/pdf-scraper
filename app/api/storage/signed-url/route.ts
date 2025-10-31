@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server'
 import { requireAuthenticatedUser } from '@/lib/middleware/auth-middleware'
 import { badRequest, serverError } from '@/lib/api-errors'
 import { success } from '@/lib/api-response'

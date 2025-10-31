@@ -57,6 +57,19 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model PasswordResetOTP {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String   // Hashed OTP
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
 enum ResumeStatus {
   PENDING
   COMPLETED
