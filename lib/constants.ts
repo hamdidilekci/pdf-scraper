@@ -46,10 +46,6 @@ export const ERROR_MESSAGES = {
 	MISSING_ENV_VAR: 'Required environment variable is missing'
 } as const
 
-// Pagination
-export const DEFAULT_PAGE_LIMIT = 20
-export const MAX_PAGE_LIMIT = 100
-
 // OpenAI Files API Purpose
 export const OPENAI_FILE_PURPOSE = 'user_data' as const
 

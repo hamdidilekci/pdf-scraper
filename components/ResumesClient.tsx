@@ -19,8 +19,6 @@ interface ResumeItem {
 
 interface ResumesData {
 	items: ResumeItem[]
-	hasMore: boolean
-	nextCursor?: string
 }
 
 export default function ResumesClient() {
@@ -30,13 +28,11 @@ export default function ResumesClient() {
 	const [deleting, setDeleting] = useState(false)
 	const [searchTerm, setSearchTerm] = useState('')
 	const [statusFilter, setStatusFilter] = useState('ALL')
-	const [cursor, setCursor] = useState<string | undefined>()
 
 	const fetchResumes = useCallback(async () => {
 		try {
 			setLoading(true)
 			const params = new URLSearchParams()
-			if (cursor) params.set('cursor', cursor)
 			if (statusFilter !== 'ALL') params.set('status', statusFilter)
 			if (searchTerm) params.set('search', searchTerm)
 
@@ -61,7 +57,7 @@ export default function ResumesClient() {
 		} finally {
 			setLoading(false)
 		}
-	}, [cursor, statusFilter, searchTerm])
+	}, [statusFilter, searchTerm])
 
 	// Track if this is the initial mount
 	const isInitialMount = useRef(true)
@@ -87,7 +83,6 @@ export default function ResumesClient() {
 		if (status === 'loading' || !session) return
 
 		const timeoutId = setTimeout(() => {
-			setCursor(undefined) // Reset pagination
 			fetchResumes()
 		}, 500) // Debounce search
 
@@ -100,7 +95,6 @@ export default function ResumesClient() {
 		if (isInitialMount.current) return // Skip on initial mount
 		if (status === 'loading' || !session) return
 
-		setCursor(undefined) // Reset pagination
 		setData(null) // Clear data immediately to prevent showing stale results
 		fetchResumes()
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +122,6 @@ export default function ResumesClient() {
 			}
 
 			// Refresh the list
-			setCursor(undefined) // Reset to first page
 			await fetchResumes()
 		} finally {
 			setDeleting(false)

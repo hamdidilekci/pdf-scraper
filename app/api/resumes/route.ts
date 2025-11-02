@@ -9,7 +9,6 @@ export async function GET(req: Request) {
 		const userId = await requireAuthenticatedUser()
 
 		const { searchParams } = new URL(req.url)
-		const cursor = searchParams.get('cursor') || undefined
 		const status = searchParams.get('status') || undefined
 		const search = searchParams.get('search') || undefined
 		const limit = parseInt(searchParams.get('limit') || '20', 10)
@@ -17,7 +16,6 @@ export async function GET(req: Request) {
 		const resumeService = new ResumeService()
 		const result = await resumeService.list({
 			userId,
-			cursor,
 			status,
 			search,
 			limit

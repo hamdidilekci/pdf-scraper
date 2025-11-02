@@ -1,11 +1,9 @@
 import prisma from '@/lib/prisma'
 import { Prisma, ResumeStatus } from '@prisma/client'
-import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/constants'
 import { logger } from '@/lib/logger'
 
 export interface ListResumesParams {
 	userId: string
-	cursor?: string
 	status?: string
 	search?: string
 	limit?: number
@@ -18,8 +16,6 @@ export interface ListResumesResult {
 		uploadedAt: Date
 		status: ResumeStatus
 	}>
-	hasMore: boolean
-	nextCursor?: string
 }
 
 export interface CreateResumeParams {
@@ -38,8 +34,7 @@ export interface UpdateResumeParams {
 
 export class ResumeService {
 	async list(params: ListResumesParams): Promise<ListResumesResult> {
-		const { userId, cursor, status, search, limit = DEFAULT_PAGE_LIMIT } = params
-		const take = Math.min(limit, MAX_PAGE_LIMIT) + 1 // Take one extra to check if there are more
+		const { userId, status, search, limit = 20 } = params
 
 		const where: Prisma.ResumeWhereInput = { userId }
 
@@ -56,50 +51,20 @@ export class ResumeService {
 
 		const orderBy: Prisma.ResumeOrderByWithRelationInput = { uploadedAt: 'desc' }
 
-		let items
-		if (cursor) {
-			const cursorDate = new Date(cursor)
-			items = await prisma.resume.findMany({
-				where: {
-					...where,
-					uploadedAt: {
-						lt: cursorDate
-					}
-				},
-				orderBy,
-				take,
-				select: {
-					id: true,
-					fileName: true,
-					uploadedAt: true,
-					status: true
-				}
-			})
-		} else {
-			items = await prisma.resume.findMany({
-				where,
-				orderBy,
-				take,
-				select: {
-					id: true,
-					fileName: true,
-					uploadedAt: true,
-					status: true
-				}
-			})
-		}
-
-		const hasMore = items.length > limit
-		if (hasMore) {
-			items = items.slice(0, limit)
-		}
-
-		const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].uploadedAt.toISOString() : undefined
+		const items = await prisma.resume.findMany({
+			where,
+			orderBy,
+			take: limit,
+			select: {
+				id: true,
+				fileName: true,
+				uploadedAt: true,
+				status: true
+			}
+		})
 
 		return {
-			items,
-			hasMore,
-			nextCursor
+			items
 		}
 	}
 
