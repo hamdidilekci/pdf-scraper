@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { DEFAULT_OPENAI_MODEL, DEFAULT_STORAGE_BUCKET } from './constants'
+import { DEFAULT_STORAGE_BUCKET } from './constants'
 
 // Environment variable validation schema
 const envSchema = z.object({
@@ -16,7 +16,6 @@ const envSchema = z.object({
 
 	// OpenAI
 	OPENAI_API_KEY: z.string().min(1),
-	OPENAI_RESPONSES_MODEL: z.string().optional(),
 
 	// NextAuth
 	NEXTAUTH_SECRET: z.string().min(1),
@@ -52,7 +51,6 @@ function validateEnv(): Env {
 			NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 			SUPABASE_STORAGE_BUCKET: process.env.SUPABASE_STORAGE_BUCKET,
 			OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-			OPENAI_RESPONSES_MODEL: process.env.OPENAI_RESPONSES_MODEL,
 			NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
 			NEXTAUTH_URL: process.env.NEXTAUTH_URL,
 			RESEND_API_KEY: process.env.RESEND_API_KEY,
@@ -90,8 +88,7 @@ export const config = {
 		storageBucket: env.SUPABASE_STORAGE_BUCKET || DEFAULT_STORAGE_BUCKET
 	},
 	openai: {
-		apiKey: env.OPENAI_API_KEY,
-		model: env.OPENAI_RESPONSES_MODEL || DEFAULT_OPENAI_MODEL
+		apiKey: env.OPENAI_API_KEY
 	},
 	nextAuth: {
 		secret: env.NEXTAUTH_SECRET,

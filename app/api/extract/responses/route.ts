@@ -5,15 +5,13 @@ import { StorageService } from '@/lib/services/storage.service'
 import { ResumeService } from '@/lib/services/resume.service'
 import { ExtractionService } from '@/lib/services/extraction.service'
 import { CreditService } from '@/lib/services/credit.service'
-import { config } from '@/lib/config'
 import { logger } from '@/lib/logger'
-import { CREDITS_PER_RESUME } from '@/lib/constants'
+import { CREDITS_PER_RESUME, DEFAULT_OPENAI_MODEL } from '@/lib/constants'
 
 export const runtime = 'nodejs'
 
 type Body = {
 	storagePath?: string
-	model?: string
 }
 
 export async function POST(req: Request) {
@@ -22,7 +20,6 @@ export async function POST(req: Request) {
 
 		const body = (await req.json()) as Body
 		const storagePath = body?.storagePath
-		const requestedModel = (body?.model || config.openai.model).trim()
 
 		if (!storagePath) {
 			return badRequest('Resume file information is missing. Please try uploading again')
@@ -61,7 +58,7 @@ export async function POST(req: Request) {
 			resumeId: resume.id,
 			pdfArrayBuffer,
 			fileName: resume.fileName,
-			model: requestedModel
+			model: DEFAULT_OPENAI_MODEL
 		})
 
 		// Deduct credits after successful extraction

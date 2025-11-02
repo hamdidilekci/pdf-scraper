@@ -4,7 +4,7 @@ export const OPENAI_FILES_URL = `${OPENAI_API_BASE}/files`
 export const OPENAI_RESPONSES_URL = `${OPENAI_API_BASE}/responses`
 
 // Default Model
-export const DEFAULT_OPENAI_MODEL = 'gpt-4.1'
+export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini' as const
 
 // File Configuration
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
