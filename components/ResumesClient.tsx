@@ -78,6 +78,7 @@ export default function ResumesClient() {
 
 		setData(null) // Clear data immediately to prevent showing stale results
 		fetchResumes()
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [statusFilter])
 
 	const handleSearch = (value: string) => {
