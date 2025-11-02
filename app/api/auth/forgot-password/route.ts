@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 		const parsed = schema.safeParse(json)
 
 		if (!parsed.success) {
-			return badRequest('Please enter a valid email address')
+			throw badRequest('Please enter a valid email address')
 		}
 
 		email = parsed.data.email
@@ -33,15 +33,15 @@ export async function POST(request: Request) {
 	} catch (error) {
 		if (error instanceof Error && error.message.includes('Too many')) {
 			logger.warn('Rate limit exceeded', { error: error.message, email })
-			return badRequest(error.message)
+			throw badRequest(error.message)
 		}
 
 		if (error instanceof Error && error.message.includes('Email service is not configured')) {
 			logger.error('Email service configuration error', error, { endpoint: '/api/auth/forgot-password', email })
-			return serverError('Email service is not configured. Please contact support.')
+			throw serverError('Email service is not configured. Please contact support.')
 		}
 
 		logger.error('Forgot password error', error, { endpoint: '/api/auth/forgot-password', email })
-		return serverError('We could not process your request. Please try again later.')
+		throw serverError('We could not process your request. Please try again later.')
 	}
 }

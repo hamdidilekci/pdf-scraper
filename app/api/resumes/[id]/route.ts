@@ -1,5 +1,5 @@
 import { requireAuthenticatedUser } from '@/lib/middleware/auth-middleware'
-import { notFound, serverError } from '@/lib/api-errors'
+import { notFound, serverError, unauthorized } from '@/lib/api-errors'
 import { success } from '@/lib/api-response'
 import { ResumeService } from '@/lib/services/resume.service'
 import { StorageService } from '@/lib/services/storage.service'
@@ -15,18 +15,17 @@ export async function GET(_: Request, { params }: Params) {
 		const item = await resumeService.findById(params.id, userId)
 
 		if (!item) {
-			return notFound('This resume could not be found or you do not have permission to view it')
+			throw notFound('This resume could not be found or you do not have permission to view it')
 		}
 
 		return success({ item })
 	} catch (error) {
 		if (error instanceof Error && error.message === 'Unauthorized') {
-			const { unauthorized } = await import('@/lib/api-errors')
-			return unauthorized()
+			throw unauthorized()
 		}
 
 		logger.error('Get resume error', error, { endpoint: '/api/resumes/[id]', resumeId: params.id })
-		return serverError('We could not load this resume. Please try again')
+		throw serverError('We could not load this resume. Please try again')
 	}
 }
 
@@ -55,16 +54,15 @@ export async function DELETE(_: Request, { params }: Params) {
 		return success({ message: 'Resume deleted successfully' })
 	} catch (error) {
 		if (error instanceof Error && error.message === 'Unauthorized') {
-			const { unauthorized } = await import('@/lib/api-errors')
-			return unauthorized()
+			throw unauthorized()
 		}
 
 		if (error instanceof Error && error.message.includes('not found')) {
 			logger.warn('Delete resume error - Resume not found', { endpoint: '/api/resumes/[id]', resumeId: params.id })
-			return notFound(error.message)
+			throw notFound(error.message)
 		}
 
 		logger.error('Delete resume error', error, { endpoint: '/api/resumes/[id]', resumeId: params.id })
-		return serverError('We could not delete this resume. Please try again')
+		throw serverError('We could not delete this resume. Please try again')
 	}
 }

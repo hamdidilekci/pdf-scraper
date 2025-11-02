@@ -1,5 +1,5 @@
 import { requireAuthenticatedUser } from '@/lib/middleware/auth-middleware'
-import { badRequest, serverError } from '@/lib/api-errors'
+import { badRequest, serverError, unauthorized } from '@/lib/api-errors'
 import { success } from '@/lib/api-response'
 import { StorageService } from '@/lib/services/storage.service'
 import { ResumeService } from '@/lib/services/resume.service'
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 		const { fileName, contentType = 'application/pdf', action = 'upload', storagePath } = body
 
 		if (!fileName) {
-			return badRequest('Please select a file to upload')
+			throw badRequest('Please select a file to upload')
 		}
 
 		const storageService = new StorageService()
@@ -65,8 +65,7 @@ export async function POST(req: Request) {
 		})
 	} catch (error) {
 		if (error instanceof Error && error.message === 'Unauthorized') {
-			const { unauthorized } = await import('@/lib/api-errors')
-			return unauthorized()
+			throw unauthorized()
 		}
 
 		logger.error('Storage signed URL error', error, { endpoint: '/api/storage/signed-url' })
@@ -81,6 +80,6 @@ export async function POST(req: Request) {
 			}
 		}
 
-		return serverError(userMessage)
+		throw serverError(userMessage)
 	}
 }

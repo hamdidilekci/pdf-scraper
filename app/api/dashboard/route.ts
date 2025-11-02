@@ -1,9 +1,8 @@
 import { requireAuthenticatedUser } from '@/lib/middleware/auth-middleware'
-import { serverError } from '@/lib/api-errors'
+import { serverError, unauthorized } from '@/lib/api-errors'
 import { success } from '@/lib/api-response'
 import { ResumeService } from '@/lib/services/resume.service'
 import { logger } from '@/lib/logger'
-import { unauthorized } from '@/lib/api-errors'
 
 export async function GET() {
 	try {
@@ -15,10 +14,10 @@ export async function GET() {
 		return success(stats)
 	} catch (error) {
 		if (error instanceof Error && error.message === 'Unauthorized') {
-			return unauthorized()
+			throw unauthorized()
 		}
 
 		logger.error('Dashboard API error', error, { endpoint: '/api/dashboard' })
-		return serverError('We could not load your dashboard statistics. Please refresh the page')
+		throw serverError('We could not load your dashboard statistics. Please refresh the page')
 	}
 }

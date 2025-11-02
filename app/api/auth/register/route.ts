@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 				if (err.path.includes('password')) return 'Password must be at least 8 characters long'
 				return err.message
 			})
-			return badRequest(errorDetails.join('. '), parsed.error.errors)
+			throw badRequest(errorDetails.join('. '), parsed.error.errors)
 		}
 
 		const email = parsed.data.email.toLowerCase()
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
 		if (exists) {
 			logger.warn('Email already in use', { email })
-			return conflict('An account with this email already exists. Please sign in instead')
+			throw conflict('An account with this email already exists. Please sign in instead')
 		}
 
 		const hashedPassword = await bcrypt.hash(parsed.data.password, 10)
@@ -45,6 +45,6 @@ export async function POST(request: Request) {
 		return created({ ok: true })
 	} catch (error) {
 		logger.error('Registration error', error, { endpoint: '/api/auth/register' })
-		return serverError('We could not create your account right now. Please try again')
+		throw serverError('We could not create your account right now. Please try again')
 	}
 }

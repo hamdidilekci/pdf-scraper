@@ -17,19 +17,19 @@ export async function POST(request: Request) {
 
 		if (!parsed.success) {
 			const errorMessage = parsed.error.errors[0]?.message || 'Invalid input'
-			return badRequest(errorMessage)
+			throw badRequest(errorMessage)
 		}
 
 		const otpService = new OTPService()
 		const isValid = await otpService.validatePasswordResetOTP(parsed.data.email, parsed.data.otp)
 
 		if (!isValid) {
-			return badRequest('Invalid or expired verification code. Please request a new one.')
+			throw badRequest('Invalid or expired verification code. Please request a new one.')
 		}
 
 		return success({ verified: true })
 	} catch (error) {
 		logger.error('Verify OTP error', error, { endpoint: '/api/auth/verify-otp' })
-		return serverError('We could not verify your code. Please try again.')
+		throw serverError('We could not verify your code. Please try again.')
 	}
 }

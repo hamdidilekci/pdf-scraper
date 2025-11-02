@@ -21,7 +21,7 @@ export async function GET() {
 		})
 
 		if (!user) {
-			return serverError('Could not find your account information. Please try again.')
+			throw serverError('Could not find your account information. Please try again.')
 		}
 
 		return success({
@@ -32,10 +32,10 @@ export async function GET() {
 		})
 	} catch (error) {
 		if (error instanceof Error && error.message === 'Unauthorized') {
-			return unauthorized()
+			throw unauthorized()
 		}
 
 		logger.error('User API error', error, { endpoint: '/api/user' })
-		return serverError('We could not load your account information. Please refresh the page')
+		throw serverError('We could not load your account information. Please refresh the page')
 	}
 }

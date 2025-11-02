@@ -14,7 +14,7 @@ export async function POST() {
 
 		// Check if Stripe is configured
 		if (!config.stripe.secretKey) {
-			return serverError('Payment service is not configured. Please contact support.')
+			throw serverError('Payment service is not configured. Please contact support.')
 		}
 
 		// Get user's Stripe customer ID
@@ -24,11 +24,11 @@ export async function POST() {
 		})
 
 		if (!user) {
-			return serverError('Could not find your account information. Please try again.')
+			throw serverError('Could not find your account information. Please try again.')
 		}
 
 		if (!user.stripeCustomerId) {
-			return badRequest('You do not have an active subscription. Please subscribe to a plan first.')
+			throw badRequest('You do not have an active subscription. Please subscribe to a plan first.')
 		}
 
 		const stripeService = new StripeService()
@@ -39,14 +39,14 @@ export async function POST() {
 		return success({ url: session.url })
 	} catch (error) {
 		if (error instanceof Error && error.message === 'Unauthorized') {
-			return unauthorized()
+			throw unauthorized()
 		}
 
 		if (error instanceof Error && error.message.includes('Stripe is not configured')) {
-			return serverError('Payment service is not configured. Please contact support.')
+			throw serverError('Payment service is not configured. Please contact support.')
 		}
 
 		logger.error('Portal session creation error', error, { endpoint: '/api/stripe/portal' })
-		return serverError('We could not create the billing portal session. Please try again')
+		throw serverError('We could not create the billing portal session. Please try again')
 	}
 }

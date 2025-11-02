@@ -1,5 +1,5 @@
 import { requireAuthenticatedUser } from '@/lib/middleware/auth-middleware'
-import { badRequest, notFound, serverError } from '@/lib/api-errors'
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-errors'
 import { success } from '@/lib/api-response'
 import { StorageService } from '@/lib/services/storage.service'
 import { ResumeService } from '@/lib/services/resume.service'
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 		const storagePath = body?.storagePath
 
 		if (!storagePath) {
-			return badRequest('Resume file information is missing. Please try uploading again')
+			throw badRequest('Resume file information is missing. Please try uploading again')
 		}
 
 		const resumeService = new ResumeService()
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 		try {
 			const hasCredits = await creditService.checkCredits(userId, CREDITS_PER_RESUME)
 			if (!hasCredits) {
-				return badRequest(
+				throw badRequest(
 					`You don't have enough credits. Each resume extraction costs ${CREDITS_PER_RESUME} credits. Please upgrade your plan or purchase more credits.`
 				)
 			}
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
 		// Find resume
 		const resume = await resumeService.findByStoragePath(storagePath, userId)
 		if (!resume) {
-			return notFound('The resume you are trying to process could not be found. Please try uploading again')
+			throw notFound('The resume you are trying to process could not be found. Please try uploading again')
 		}
 
 		// Download PDF
@@ -74,8 +74,7 @@ export async function POST(req: Request) {
 		return success({ resumeId: result.resumeId })
 	} catch (error) {
 		if (error instanceof Error && error.message === 'Unauthorized') {
-			const { unauthorized } = await import('@/lib/api-errors')
-			return unauthorized()
+			throw unauthorized()
 		}
 
 		logger.error('Resume extraction error', error, { endpoint: '/api/extract/responses' })
@@ -94,6 +93,6 @@ export async function POST(req: Request) {
 			}
 		}
 
-		return serverError(userMessage)
+		throw serverError(userMessage)
 	}
 }

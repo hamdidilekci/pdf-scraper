@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 					return err.message
 				})
 				.join('. ')
-			return badRequest(errorMessage)
+			throw badRequest(errorMessage)
 		}
 
 		const { email, otp, password } = parsed.data
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 			// Also check if OTP is valid now (in case they're doing it in one go)
 			const isValid = await otpService.validatePasswordResetOTP(normalizedEmail, otp)
 			if (!isValid) {
-				return badRequest('Invalid or expired verification code. Please request a new one.')
+				throw badRequest('Invalid or expired verification code. Please request a new one.')
 			}
 		}
 
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
 		if (!user) {
 			logger.warn('Reset password attempted for non-existent user', { email: normalizedEmail })
-			return notFound('User not found')
+			throw notFound('User not found')
 		}
 
 		// Hash new password
@@ -75,6 +75,6 @@ export async function POST(request: Request) {
 		return success({ message: 'Your password has been reset successfully.' })
 	} catch (error) {
 		logger.error('Reset password error', error, { endpoint: '/api/auth/reset-password' })
-		return serverError('We could not reset your password. Please try again.')
+		throw serverError('We could not reset your password. Please try again.')
 	}
 }
