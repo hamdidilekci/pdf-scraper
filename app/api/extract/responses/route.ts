@@ -52,8 +52,13 @@ export async function POST(req: Request) {
 		// Download PDF
 		const pdfArrayBuffer = await storageService.downloadFile(storagePath)
 
-		// Extract resume data
+		// Extract resume data using the new modular extraction system
 		const extractionService = new ExtractionService()
+
+		// Optional: You can now analyze the PDF first to see what strategy will be used
+		// const analysisResult = await extractionService.analyzePDF(pdfArrayBuffer)
+		// logger.info('PDF analysis preview', { analysisResult })
+
 		const result = await extractionService.extractResume({
 			resumeId: resume.id,
 			pdfArrayBuffer,

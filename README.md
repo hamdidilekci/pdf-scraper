@@ -1,16 +1,44 @@
 # PDF Scraper App
 
-A production-ready Next.js application that allows users to upload and extract structured data from PDF files using OpenAI. The application handles different PDF types, stores results in a Supabase database, and presents a clear, responsive interface.
+A production-ready Next.js application that allows users to upload and extract structured data from PDF files using AI. The application features a **modular extraction system** that automatically selects the best strategy for different PDF types, stores results in a Supabase database, and presents a clear, responsive interface.
 
-## Features
+## 🚀 Key Features
 
-- **Authentication**: NextAuth with credentials (username/password)
-- **PDF Upload**: Drag-and-drop interface with file validation (≤10MB, PDF only)
-- **Data Extraction**: OpenAI-powered structured JSON extraction from resume PDFs
-- **Database Storage**: Supabase Postgres with Prisma ORM
-- **File Storage**: Supabase Storage for PDF files
-- **Responsive UI**: TailwindCSS with toast notifications
-- **Type Safety**: Full TypeScript with Zod validation
+- **🔐 Authentication**: NextAuth with credentials (username/password)
+- **📄 PDF Upload**: Drag-and-drop interface with file validation (≤10MB, PDF only)
+- **🤖 Smart Data Extraction**: Modular AI-powered extraction system with automatic strategy selection
+- **📊 Multiple PDF Types**: Supports text-based PDFs (with OCR support planned for scanned documents)
+- **💾 Database Storage**: Supabase Postgres with Prisma ORM
+- **☁️ File Storage**: Supabase Storage for PDF files
+- **🎨 Responsive UI**: TailwindCSS with toast notifications
+- **🔒 Type Safety**: Full TypeScript with Zod validation
+- **🔧 Extensible Architecture**: Easy to add new extraction strategies and AI providers
+
+## 🏗️ Modular Extraction System
+
+The app now features a sophisticated, extensible extraction system:
+
+### Architecture
+```
+ExtractionService (Orchestrator)
+├── PDFAnalyzer (Analyzes PDF content type)
+├── StrategyFactory (Selects best extraction method)
+└── Extraction Strategies
+    ├── TextExtractionStrategy (OpenAI file API)
+    ├── ImageExtractionStrategy (OCR - planned)
+    └── [Custom strategies...]
+```
+
+### Benefits
+- **🔄 Automatic Strategy Selection**: Analyzes PDFs and chooses the best extraction method
+- **📈 Easy to Extend**: Add new extraction strategies without changing existing code
+- **🔬 Future-Ready**: Prepared for OCR, computer vision, and new AI models
+- **🎯 Strategy-Specific**: Each PDF type gets optimized processing
+
+### API Endpoints
+- `POST /api/extract/responses` - Extract resume data (auto-selects strategy)
+- `POST /api/extract/analyze` - Analyze PDF and get strategy recommendation
+- `GET /api/extract/strategies` - List available extraction strategies
 
 ## Getting Started
 
