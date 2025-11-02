@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ResumesDataTable } from '@/components/ResumesDataTable'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ResumesTableSkeleton } from '@/components/skeletons/ResumesTableSkeleton'
 
 interface ResumeItem {
 	id: string
@@ -147,19 +147,7 @@ export default function ResumesClient() {
 						<Skeleton className="h-10 w-64" />
 						<Skeleton className="h-10 w-32" />
 					</div>
-					<div className="rounded border bg-white p-6">
-						<div className="space-y-3">
-							{[...Array(5)].map((_, i) => (
-								<div key={i} className="flex items-center justify-between py-3">
-									<div className="flex-1">
-										<Skeleton className="h-5 w-48 mb-1" />
-										<Skeleton className="h-4 w-32" />
-									</div>
-									<Skeleton className="h-8 w-16" />
-								</div>
-							))}
-						</div>
-					</div>
+					<ResumesTableSkeleton />
 				</div>
 			</div>
 		)
@@ -209,44 +197,7 @@ export default function ResumesClient() {
 
 			{/* Results */}
 			{loading || deleting ? (
-				<div className="rounded-md border">
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>
-									<Skeleton className="h-4 w-24" />
-								</TableHead>
-								<TableHead>
-									<Skeleton className="h-4 w-16" />
-								</TableHead>
-								<TableHead>
-									<Skeleton className="h-4 w-32" />
-								</TableHead>
-								<TableHead>
-									<Skeleton className="h-4 w-20" />
-								</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{[...Array(5)].map((_, i) => (
-								<TableRow key={i}>
-									<TableCell>
-										<Skeleton className="h-5 w-48" />
-									</TableCell>
-									<TableCell>
-										<Skeleton className="h-6 w-20 rounded-full" />
-									</TableCell>
-									<TableCell>
-										<Skeleton className="h-4 w-32" />
-									</TableCell>
-									<TableCell>
-										<Skeleton className="h-8 w-8 rounded-md" />
-									</TableCell>
-								</TableRow>
-							))}
-						</TableBody>
-					</Table>
-				</div>
+				<ResumesTableSkeleton />
 			) : !data?.items || data.items.length === 0 ? (
 				<div className="text-center py-8">
 					<svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

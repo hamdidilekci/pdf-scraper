@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { JsonViewerSkeleton } from '@/components/skeletons/JsonViewerSkeleton'
 
 interface JsonViewerProps {
 	data: unknown
@@ -41,20 +41,7 @@ export default function JsonViewer({ data, loading = false }: JsonViewerProps) {
 	}, [json])
 
 	if (loading) {
-		return (
-			<div className="space-y-3">
-				<div className="flex gap-3">
-					<Skeleton className="h-8 w-16" />
-					<Skeleton className="h-8 w-20" />
-				</div>
-				<div className="space-y-2">
-					<Skeleton className="h-4 w-full" />
-					<Skeleton className="h-4 w-3/4" />
-					<Skeleton className="h-4 w-1/2" />
-					<Skeleton className="h-4 w-5/6" />
-				</div>
-			</div>
-		)
+		return <JsonViewerSkeleton />
 	}
 
 	return (
