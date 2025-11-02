@@ -1,6 +1,6 @@
-import { getSupabaseAdmin } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { config } from '@/lib/config'
-import { SIGNED_URL_EXPIRY_SECONDS, DEFAULT_FILE_NAME } from '@/lib/constants'
+import { SIGNED_URL_EXPIRY_SECONDS } from '@/lib/constants'
 import { logger } from '@/lib/logger'
 import { createHash } from 'crypto'
 
@@ -27,7 +27,9 @@ export interface DownloadResponse {
 }
 
 export class StorageService {
-	private supabase = getSupabaseAdmin()
+	private supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey, {
+		auth: { persistSession: false }
+	})
 	private bucket = config.supabase.storageBucket
 
 	async createUploadUrl(request: UploadRequest): Promise<UploadResponse> {

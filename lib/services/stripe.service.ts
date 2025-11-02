@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger'
 import prisma from '@/lib/prisma'
 
 // Initialize Stripe client only if configured
-const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey, { apiVersion: '2024-11-20.acacia' }) : null
+const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey, { apiVersion: '2025-10-29.clover' }) : null
 
 export class StripeService {
 	/**
