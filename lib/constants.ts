@@ -2,9 +2,16 @@
 export const OPENAI_API_BASE = 'https://api.openai.com/v1'
 export const OPENAI_FILES_URL = `${OPENAI_API_BASE}/files`
 export const OPENAI_RESPONSES_URL = `${OPENAI_API_BASE}/responses`
+export const OPENAI_CHAT_COMPLETIONS_URL = `${OPENAI_API_BASE}/chat/completions`
 
 // Default Model
 export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini' as const
+
+// Vision Model for image-based PDFs
+export const VISION_MODEL = 'gpt-4o' as const
+
+// PDF to Image Configuration
+export const MAX_PDF_PAGES = 10 // Limit pages to control costs and processing time
 
 // File Configuration
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB

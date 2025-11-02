@@ -105,3 +105,56 @@ Rules:
  - Return ONLY the JSON object; no markdown, no code fences, no prose
  - Ensure enums strictly match the allowed values (employmentType, locationType, degree, language level)
 `
+
+/**
+ * Creates an enhanced prompt for image-based or hybrid PDFs that includes the initial extraction result
+ * This prompts the model to review and correct potentially incomplete or inaccurate data from the first pass
+ */
+export function createEnhancedPrompt(initialJson: any): string {
+	return `${extractionSystemPrompt}
+
+IMPORTANT: This is an image-based/hybrid PDF file that was previously extracted, but the initial extraction may have missing or incorrect information due to the PDF's content type.
+
+Please carefully review the PDF again and the initial extraction result below. Pay special attention to:
+- OCR accuracy for image-based content
+- Text recognition quality
+- Missing fields that may have been overlooked
+- Incorrect values due to OCR errors
+- Proper parsing of dates, names, and contact information
+
+Initial extraction result:
+${JSON.stringify(initialJson, null, 2)}
+
+Now, analyze the PDF more carefully and provide a corrected, complete JSON object with accurate information. Return ONLY the corrected JSON object without any additional text or markdown.`
+}
+
+/**
+ * Creates a vision-optimized prompt for image-based or hybrid PDFs
+ * This prompt is used with OpenAI Vision API to extract data from PDF page images
+ */
+export function createVisionPrompt(pageNumber?: number, totalPages?: number): string {
+	const pageContext = totalPages && totalPages > 1 
+		? `This is page ${pageNumber || 1} of ${totalPages} from an image-based or hybrid PDF resume.`
+		: `This is an image-based or hybrid PDF resume page.`
+
+	return `${extractionSystemPrompt}
+
+IMPORTANT: ${pageContext} You are extracting resume information directly from the image content using OCR and visual analysis.
+
+Since this is an image-based or hybrid PDF, please:
+- Carefully analyze all text visible in the image using OCR capabilities
+- Pay special attention to text quality, font clarity, and layout
+- Extract all visible information including contact details, work experience, education, skills, etc.
+- Handle partial information gracefully (this may be one page of a multi-page resume)
+- If certain fields are not visible on this page, use empty strings, null, or empty arrays as appropriate
+- Ensure OCR accuracy for names, dates, email addresses, and other critical information
+- Recognize and handle various date formats (MM/YYYY, Month YYYY, YYYY-MM-DD, etc.)
+- Extract skills, languages, and other list items even if they appear in various visual formats
+
+For multi-page resumes:
+- Focus on extracting complete information from this page
+- Include all work experiences, education entries, skills, etc. visible on this page
+- Don't worry about duplicates across pages - they will be merged later
+
+Return ONLY a valid JSON object matching the exact schema structure above, without markdown, code fences, or additional text.`
+}
