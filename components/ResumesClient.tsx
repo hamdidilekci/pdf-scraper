@@ -29,7 +29,14 @@ export default function ResumesClient() {
 	const [searchTerm, setSearchTerm] = useState('')
 	const [statusFilter, setStatusFilter] = useState('ALL')
 
-	const fetchResumes = useCallback(async () => {
+	const fetchResumes = async () => {
+		if (status === 'loading') return
+
+		if (!session) {
+			setLoading(false)
+			return
+		}
+
 		try {
 			setLoading(true)
 			const params = new URLSearchParams()
@@ -57,51 +64,28 @@ export default function ResumesClient() {
 		} finally {
 			setLoading(false)
 		}
-	}, [statusFilter, searchTerm])
+	};
 
 	// Track if this is the initial mount
 	const isInitialMount = useRef(true)
 
 	// Initial fetch on mount
 	useEffect(() => {
-		if (status === 'loading') return
-
-		if (!session) {
-			setLoading(false)
-			return
-		}
-
 		if (isInitialMount.current) {
 			isInitialMount.current = false
 			fetchResumes()
 		}
-	}, [session, status, fetchResumes])
-
-	// Separate effect for search debouncing (only when searchTerm changes)
-	useEffect(() => {
-		if (isInitialMount.current) return // Skip on initial mount
-		if (status === 'loading' || !session) return
-
-		const timeoutId = setTimeout(() => {
-			fetchResumes()
-		}, 500) // Debounce search
-
-		return () => clearTimeout(timeoutId)
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [searchTerm, fetchResumes])
-
-	// Effect for status filter changes (immediate, no debounce)
-	useEffect(() => {
-		if (isInitialMount.current) return // Skip on initial mount
-		if (status === 'loading' || !session) return
 
 		setData(null) // Clear data immediately to prevent showing stale results
 		fetchResumes()
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [statusFilter, fetchResumes])
+	}, [statusFilter])
 
 	const handleSearch = (value: string) => {
 		setSearchTerm(value)
+	}
+
+	const handleSearchClick = () => {
+		fetchResumes()
 	}
 
 	const handleStatusFilter = (status: string) => {
@@ -169,8 +153,24 @@ export default function ResumesClient() {
 
 			{/* Filters */}
 			<div className="flex flex-col sm:flex-row gap-4">
-				<div className="flex-1">
-					<Input placeholder="Search by filename..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} className="max-w-md" />
+				<div className="flex gap-2 flex-1">
+					<Input
+						placeholder="Search by filename..."
+						value={searchTerm}
+						onChange={(e) => handleSearch(e.target.value)}
+						className="max-w-md flex-1"
+						onKeyDown={(e) => {
+							if (e.key === 'Enter') {
+								handleSearchClick()
+							}
+						}}
+					/>
+					<Button
+						onClick={handleSearchClick}
+						className="px-4"
+					>
+						Search
+					</Button>
 				</div>
 				<div className="flex gap-2">
 					<Button variant={statusFilter === 'ALL' ? 'default' : 'outline'} size="sm" onClick={() => handleStatusFilter('ALL')}>
