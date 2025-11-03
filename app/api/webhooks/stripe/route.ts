@@ -125,6 +125,12 @@ async function processWebhookEvent(event: Stripe.Event, creditService: CreditSer
 				break
 			}
 
+			case 'customer.deleted': {
+				const customer = event.data.object as Stripe.Customer
+				await handleCustomerDeleted(customer)
+				break
+			}
+
 			default:
 				logger.info('Unhandled webhook event type', { eventType: event.type, eventId: event.id })
 		}
@@ -351,6 +357,37 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, creditService: CreditS
 		}
 	} catch (error) {
 		logger.error('Error handling invoice.paid', error, { invoiceId: invoice.id })
+		throw error
+	}
+}
+
+// handle customer deleted
+async function handleCustomerDeleted(customer: Stripe.Customer): Promise<void> {
+	try {
+		const user = await prisma.user.findFirst({
+			where: { stripeCustomerId: customer.id },
+			select: { id: true }
+		})
+
+		if (!user) {
+			logger.warn('User not found for customer deletion', { customerId: customer.id })
+			return
+		}
+
+		await prisma.user.update({
+			where: { id: user.id },
+			data: {
+				planType: null,
+				stripeSubscriptionId: null,
+				stripeCustomerId: null
+			}
+		})
+
+		logger.info('User customer deleted', {
+			userId: user.id
+		})
+	} catch (error) {
+		logger.error('Error handling customer.deleted', error, { customerId: customer?.id })
 		throw error
 	}
 }

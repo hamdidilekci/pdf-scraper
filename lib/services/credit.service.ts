@@ -1,6 +1,5 @@
 import prisma from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { CREDITS_PER_RESUME } from '@/lib/constants'
 
 export class CreditService {
 	/**
