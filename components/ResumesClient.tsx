@@ -64,13 +64,16 @@ export default function ResumesClient() {
 		} finally {
 			setLoading(false)
 		}
-	};
+	}
 
 	// Track if this is the initial mount
 	const isInitialMount = useRef(true)
 
-	// Initial fetch on mount
+	// Initial fetch on mount - wait for session to load
 	useEffect(() => {
+		// Don't fetch until session finishes loading
+		if (status === 'loading') return
+
 		if (isInitialMount.current) {
 			isInitialMount.current = false
 			fetchResumes()
@@ -78,8 +81,8 @@ export default function ResumesClient() {
 
 		setData(null) // Clear data immediately to prevent showing stale results
 		fetchResumes()
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [statusFilter])
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [statusFilter, status])
 
 	const handleSearch = (value: string) => {
 		setSearchTerm(value)
@@ -166,10 +169,7 @@ export default function ResumesClient() {
 							}
 						}}
 					/>
-					<Button
-						onClick={handleSearchClick}
-						className="px-4"
-					>
+					<Button onClick={handleSearchClick} className="px-4">
 						Search
 					</Button>
 				</div>
