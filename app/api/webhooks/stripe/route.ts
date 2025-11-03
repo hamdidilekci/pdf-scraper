@@ -283,7 +283,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, cred
 
 		const user = await prisma.user.findFirst({
 			where: { stripeCustomerId: customerId },
-			select: { id: true, planType: true, credits: true }
+			select: { id: true, planType: true }
 		})
 
 		if (!user) {
@@ -299,28 +299,15 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, cred
 			return
 		}
 
-		const targetCredits = newPlanType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
-		const currentCredits = user.credits ?? 0
-		const delta = targetCredits - currentCredits
-
-		if (delta > 0) {
-			await creditService.addCredits(user.id, delta)
-		} else if (delta < 0) {
-			await creditService.deductCredits(user.id, Math.min(currentCredits, Math.abs(delta)))
-		}
-
 		await prisma.user.update({
 			where: { id: user.id },
 			data: { planType: newPlanType }
 		})
 
-		logger.info('User subscription plan normalized', {
+		logger.info('User subscription plan updated', {
 			userId: user.id,
 			previousPlanType: user.planType,
 			planType: newPlanType,
-			targetCredits,
-			previousCredits: currentCredits,
-			delta,
 			subscriptionId: subscription.id
 		})
 	} catch (error) {
@@ -394,7 +381,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, creditServ
 
 		const user = await prisma.user.findFirst({
 			where: { stripeCustomerId: customerId },
-			select: { id: true, planType: true, credits: true }
+			select: { id: true, planType: true }
 		})
 
 		if (!user) {
@@ -426,16 +413,6 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, creditServ
 			return
 		}
 
-		const targetCredits = planType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
-		const currentCredits = user.credits ?? 0
-		const delta = targetCredits - currentCredits
-
-		if (delta > 0) {
-			await creditService.addCredits(user.id, delta)
-		} else if (delta < 0) {
-			await creditService.deductCredits(user.id, Math.min(currentCredits, Math.abs(delta)))
-		}
-
 		await prisma.user.update({
 			where: { id: user.id },
 			data: {
@@ -445,12 +422,13 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, creditServ
 			}
 		})
 
-		logger.info('Credits normalized after invoice payment', {
+		const creditsToAdd = planType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
+		await creditService.addCredits(user.id, creditsToAdd)
+
+		logger.info('Credits added after invoice payment', {
 			userId: user.id,
 			planType,
-			targetCredits,
-			previousCredits: currentCredits,
-			delta,
+			creditsAdded: creditsToAdd,
 			invoiceId: invoice.id,
 			billingReason: expandedInvoice?.billing_reason || invoice.billing_reason,
 			subscriptionId
