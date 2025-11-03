@@ -1,15 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
+import SignOutButton from '@/components/SignOutButton'
 
 export default function Navbar() {
 	const { data: session, status } = useSession()
-
-	const handleSignOut = () => {
-		signOut({ callbackUrl: '/' })
-	}
 
 	return (
 		<nav className="border-b bg-white">
@@ -39,9 +36,7 @@ export default function Navbar() {
 					) : session ? (
 						<div className="flex items-center gap-3">
 							<span className="text-sm text-gray-600">{session.user?.email}</span>
-							<Button variant="outline" size="sm" onClick={handleSignOut} className="text-sm">
-								Sign out
-							</Button>
+							<SignOutButton />
 						</div>
 					) : (
 						<div className="flex items-center gap-3">

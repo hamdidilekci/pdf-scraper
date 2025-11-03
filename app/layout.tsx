@@ -2,6 +2,7 @@ import '@/styles/globals.css'
 import type { Metadata } from 'next'
 import Providers from '@/components/Providers'
 import Navbar from '@/components/Navbar'
+import Footer from '@/components/Footer'
 import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 				<Providers>
 					<Navbar />
 					<main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+					<Footer />
 					<Toaster position="top-right" richColors />
 				</Providers>
 			</body>

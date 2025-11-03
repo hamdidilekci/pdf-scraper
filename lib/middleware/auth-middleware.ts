@@ -1,6 +1,5 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { requireUserId } from '@/lib/prisma-types'
 import { unauthorized } from '@/lib/api-errors'
 
 export interface AuthenticatedContext {
@@ -16,7 +15,11 @@ export async function getAuthenticatedUserId(): Promise<string | null> {
 	if (!session) return null
 
 	try {
-		return requireUserId(session)
+		const user = session.user as { id?: string }
+		if (!user.id) {
+			throw new Error('Session does not contain user ID')
+		}
+		return user.id
 	} catch {
 		return null
 	}

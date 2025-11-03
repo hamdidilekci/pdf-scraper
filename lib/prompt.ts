@@ -107,28 +107,6 @@ Rules:
 `
 
 /**
- * Creates an enhanced prompt for image-based or hybrid PDFs that includes the initial extraction result
- * This prompts the model to review and correct potentially incomplete or inaccurate data from the first pass
- */
-export function createEnhancedPrompt(initialJson: any): string {
-	return `${extractionSystemPrompt}
-
-IMPORTANT: This is an image-based/hybrid PDF file that was previously extracted, but the initial extraction may have missing or incorrect information due to the PDF's content type.
-
-Please carefully review the PDF again and the initial extraction result below. Pay special attention to:
-- OCR accuracy for image-based content
-- Text recognition quality
-- Missing fields that may have been overlooked
-- Incorrect values due to OCR errors
-- Proper parsing of dates, names, and contact information
-
-Initial extraction result:
-${JSON.stringify(initialJson, null, 2)}
-
-Now, analyze the PDF more carefully and provide a corrected, complete JSON object with accurate information. Return ONLY the corrected JSON object without any additional text or markdown.`
-}
-
-/**
  * Creates a vision-optimized prompt for image-based or hybrid PDFs
  * This prompt is used with OpenAI Vision API to extract data from PDF page images
  */

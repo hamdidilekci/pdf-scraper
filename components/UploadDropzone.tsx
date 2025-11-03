@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { MAX_FILE_SIZE_MB, CREDITS_PER_RESUME } from '@/lib/constants'
+import { MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, SUPPORTED_FILE_TYPES } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 
@@ -20,13 +20,14 @@ export default function UploadDropzone() {
 	const onSelect = useCallback((f: File) => {
 		setError(null)
 		// file selected
-		if (f.type !== 'application/pdf') {
-			const errorMsg = 'Please select a PDF file. Other file types are not supported'
+		const isSupportedType = SUPPORTED_FILE_TYPES.includes(f.type as (typeof SUPPORTED_FILE_TYPES)[number])
+		if (!isSupportedType) {
+			const errorMsg = `Unsupported file type. Please upload one of: ${SUPPORTED_FILE_TYPES.join(', ')}`
 			setError(errorMsg)
 			toast.error(errorMsg)
 			return
 		}
-		const maxBytes = 10 * 1024 * 1024
+		const maxBytes = MAX_FILE_SIZE_BYTES
 		if (f.size > maxBytes) {
 			const errorMsg = `File size (${(f.size / (1024 * 1024)).toFixed(1)}MB) exceeds the ${MAX_FILE_SIZE_MB}MB limit. Please choose a smaller file`
 			setError(errorMsg)
