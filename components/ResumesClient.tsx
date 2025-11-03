@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -64,19 +64,9 @@ export default function ResumesClient() {
 		}
 	}
 
-	// Track if this is the initial mount
-	const isInitialMount = useRef(true)
-
-	// Initial fetch on mount - wait for session to load
+	// Initial fetch and refetch on filter/status change
 	useEffect(() => {
 		if (status === 'loading') return
-
-		if (isInitialMount.current) {
-			isInitialMount.current = false
-			fetchResumes()
-		}
-
-		setData(null)
 		fetchResumes()
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [statusFilter, status])

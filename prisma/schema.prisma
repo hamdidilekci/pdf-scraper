@@ -97,6 +97,9 @@ model Resume {
   resumeData   Json?
 
   histories    ResumeHistory[]
+
+  @@index([userId, uploadedAt(sort: Desc)])
+  @@index([userId, status, uploadedAt(sort: Desc)])
 }
 
 model ResumeHistory {
