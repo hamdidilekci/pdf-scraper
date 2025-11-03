@@ -6,10 +6,9 @@ import { logger } from '@/lib/logger'
 import { PLAN_TYPES, PLAN_CREDITS } from '@/lib/constants'
 import prisma from '@/lib/prisma'
 import Stripe from 'stripe'
+import type { CheckoutSessionWithMetadata, InvoiceWithSubscription, InvoiceLineWithPrice } from './types/types'
 
-export const runtime = 'nodejs'
-
-// Next.js needs this to disable body parsing for webhook signature verification
+// Required: prevents Next.js from pre-parsing body, which would break Stripe signature verification
 export const dynamic = 'force-dynamic'
 
 async function getRawBody(request: Request): Promise<Buffer> {
@@ -27,26 +26,6 @@ async function getRawBody(request: Request): Promise<Buffer> {
 	}
 
 	return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))
-}
-
-type CheckoutSessionWithMetadata = Stripe.Checkout.Session & {
-	metadata?: {
-		userId?: string
-		planType?: string
-		priceId?: string
-	}
-}
-
-type InvoiceWithSubscription = Stripe.Invoice & {
-	subscription?: string | Stripe.Subscription | null
-	subscription_details?: {
-		subscription?: string | Stripe.Subscription | null
-	}
-}
-
-type InvoiceLineWithPrice = Stripe.InvoiceLineItem & {
-	price?: Stripe.Price | null
-	plan?: Stripe.Plan | null
 }
 
 function extractSubscriptionId(invoice: InvoiceWithSubscription): string | null {
@@ -172,6 +151,12 @@ async function processWebhookEvent(event: Stripe.Event, creditService: CreditSer
 				break
 			}
 
+			case 'customer.subscription.created': {
+				const subscription = event.data.object as Stripe.Subscription
+				await handleSubscriptionCreated(subscription, creditService)
+				break
+			}
+
 			case 'customer.subscription.updated': {
 				const subscription = event.data.object as Stripe.Subscription
 				await handleSubscriptionUpdated(subscription, creditService)
@@ -221,9 +206,19 @@ async function handleCheckoutSessionCompleted(session: CheckoutSessionWithMetada
 			return
 		}
 
-		const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id
+		// Get subscription ID - if not present, retrieve the session with expanded subscription
+		let subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id
 		if (!subscriptionId) {
-			logger.warn('Checkout session missing subscription', { sessionId: session.id })
+			logger.info('Checkout session subscription not in event, retrieving session', { sessionId: session.id })
+			const retrievedSession = await stripeService.getCheckoutSession(session.id)
+			if (retrievedSession) {
+				subscriptionId = typeof retrievedSession.subscription === 'string' ? retrievedSession.subscription : retrievedSession.subscription?.id
+			}
+		}
+
+		if (!subscriptionId) {
+			logger.warn('Checkout session missing subscription after retrieval', { sessionId: session.id })
+			// Don't return early - subscription.created event will handle it
 			return
 		}
 
@@ -273,6 +268,61 @@ async function handleCheckoutSessionCompleted(session: CheckoutSessionWithMetada
 		})
 	} catch (error) {
 		logger.error('Error handling checkout.session.completed', error, { sessionId: session.id })
+		throw error
+	}
+}
+
+async function handleSubscriptionCreated(subscription: Stripe.Subscription, creditService: CreditService): Promise<void> {
+	try {
+		const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
+		const userId = subscription.metadata?.userId
+
+		let user = null
+		if (userId) {
+			user = await prisma.user.findUnique({
+				where: { id: userId },
+				select: { id: true, planType: true, stripeCustomerId: true }
+			})
+		}
+
+		if (!user) {
+			// Fallback: find by customer ID
+			user = await prisma.user.findFirst({
+				where: { stripeCustomerId: customerId },
+				select: { id: true, planType: true, stripeCustomerId: true }
+			})
+		}
+
+		if (!user) {
+			logger.warn('User not found for subscription creation', { customerId, subscriptionId: subscription.id, userId })
+			return
+		}
+
+		const priceId = subscription.items.data[0]?.price?.id
+		const planType = priceId === config.stripe.priceBasic ? PLAN_TYPES.BASIC : priceId === config.stripe.pricePro ? PLAN_TYPES.PRO : null
+
+		if (!planType) {
+			logger.warn('Unknown plan type from subscription creation', { subscriptionId: subscription.id, priceId })
+			return
+		}
+
+		// Update user with subscription details
+		await prisma.user.update({
+			where: { id: user.id },
+			data: {
+				planType,
+				stripeSubscriptionId: subscription.id,
+				...(user.stripeCustomerId !== customerId ? { stripeCustomerId: customerId } : {})
+			}
+		})
+
+		logger.info('User subscription created and updated', {
+			userId: user.id,
+			planType,
+			subscriptionId: subscription.id
+		})
+	} catch (error) {
+		logger.error('Error handling subscription.created', error, { subscriptionId: subscription.id })
 		throw error
 	}
 }

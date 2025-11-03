@@ -201,4 +201,19 @@ export class StripeService {
 			return null
 		}
 	}
+
+	async getCheckoutSession(sessionId: string): Promise<Stripe.Checkout.Session | null> {
+		if (!this.isConfigured()) {
+			return null
+		}
+
+		try {
+			return await stripe!.checkout.sessions.retrieve(sessionId, {
+				expand: ['subscription', 'customer']
+			})
+		} catch (error) {
+			logger.error('Error getting checkout session', error, { sessionId })
+			return null
+		}
+	}
 }
