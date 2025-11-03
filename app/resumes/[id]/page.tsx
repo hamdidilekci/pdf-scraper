@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { requireUserId } from '@/lib/prisma-types'
+import { requireAuthenticatedUser } from '@/lib/middleware/auth-middleware'
 import { ResumeService } from '@/lib/services/resume.service'
 import JsonViewer from '@/components/JsonViewer'
 import PdfViewer from '@/components/PdfViewer'
@@ -24,7 +24,7 @@ export default async function ResumeDetailPage({ params }: Props) {
 		)
 	}
 
-	const userId = requireUserId(session)
+	const userId = await requireAuthenticatedUser()
 	const resumeService = new ResumeService()
 	const item = await resumeService.findById(params.id, userId)
 
