@@ -37,62 +37,6 @@ export interface PDFAnalysisResult {
 	recommendedStrategy: string
 }
 
-/**
- * Base interface for all extraction strategies
- */
-export interface ExtractionStrategy {
-	/**
-	 * The unique identifier for this strategy
-	 */
-	readonly strategyId: string
-
-	/**
-	 * Human-readable name for this strategy
-	 */
-	readonly displayName: string
-
-	/**
-	 * Check if this strategy can handle the given PDF content
-	 */
-	canHandle(analysisResult: PDFAnalysisResult): boolean
-
-	/**
-	 * Extract resume data from the PDF
-	 */
-	extract(params: ExtractResumeParams): Promise<ExtractionResult>
-
-	/**
-	 * Get additional metadata about the extraction process
-	 */
-	getMetadata(): ExtractionMetadata
-}
-
-/**
- * Interface for analyzing PDF content to determine the best extraction strategy
- */
 export interface PDFAnalyzer {
-	/**
-	 * Analyze PDF content to determine its characteristics
-	 */
 	analyze(pdfArrayBuffer: ArrayBuffer): Promise<PDFAnalysisResult>
-}
-
-/**
- * Factory interface for creating extraction strategies
- */
-export interface ExtractionStrategyFactory {
-	/**
-	 * Get the best strategy for the given PDF analysis result
-	 */
-	getStrategy(analysisResult: PDFAnalysisResult): ExtractionStrategy
-
-	/**
-	 * Get all available strategies
-	 */
-	getAllStrategies(): ExtractionStrategy[]
-
-	/**
-	 * Register a new strategy
-	 */
-	registerStrategy(strategy: ExtractionStrategy): void
 }

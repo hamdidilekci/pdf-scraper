@@ -14,21 +14,8 @@ import { logger } from '@/lib/logger'
 import prisma from '@/lib/prisma'
 import { InputType } from '@prisma/client'
 import { SimplePDFAnalyzer } from './extraction/pdf-analyzer'
-import { PDFContentType } from './extraction/types'
+import { type ExtractResumeParams, type ExtractionResult } from './extraction/types'
 import { PdfToImageService, PdfImageResult } from './pdf-to-image.service'
-
-export interface ExtractResumeParams {
-	resumeId: string
-	pdfArrayBuffer: ArrayBuffer
-	fileName: string
-	model: string
-}
-
-export interface ExtractionResult {
-	resumeId: string
-	historyId: string
-	resumeData: ResumeJson
-}
 
 export class ExtractionService {
 	private apiKey: string
@@ -47,8 +34,9 @@ export class ExtractionService {
 		// Step 0: Analyze PDF to determine content type
 		const analysisResult = await this.pdfAnalyzer.analyze(pdfArrayBuffer)
 
-		// Determine inputType based on analysis
-		const inputType: InputType = analysisResult.contentType === PDFContentType.TEXT_BASED ? 'TEXT' : 'IMAGES'
+		// Determine pipeline based on analyzer recommendation
+		const useVisionPipeline = analysisResult.recommendedStrategy === 'image-extraction'
+		const inputType: InputType = useVisionPipeline ? 'IMAGES' : 'TEXT'
 
 		logger.info('PDF analysis result', {
 			resumeId,
@@ -71,8 +59,7 @@ export class ExtractionService {
 			// Step 2: Determine extraction flow based on PDF type
 			let validated: any
 			let rawResponse: any
-
-			if (analysisResult.contentType === PDFContentType.TEXT_BASED) {
+			if (!useVisionPipeline) {
 				// Text-based PDFs: single-pass extraction using Responses API
 				// Step 1: Upload PDF to OpenAI Files API
 				const fileId = await this.uploadToOpenAI(pdfArrayBuffer, fileName)
