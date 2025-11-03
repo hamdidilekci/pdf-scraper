@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -49,12 +49,10 @@ export default function ResumesClient() {
 				if (result.success && result.data) {
 					setData(result.data)
 				} else {
-					// Handle error response
 					const errorMsg = result?.error?.message || 'We could not load your resumes. Please refresh the page'
 					throw new Error(errorMsg)
 				}
 			} else {
-				// Handle HTTP error
 				const errorMsg = result?.error?.message || 'We could not load your resumes. Please try again'
 				throw new Error(errorMsg)
 			}
@@ -71,7 +69,6 @@ export default function ResumesClient() {
 
 	// Initial fetch on mount - wait for session to load
 	useEffect(() => {
-		// Don't fetch until session finishes loading
 		if (status === 'loading') return
 
 		if (isInitialMount.current) {
@@ -79,7 +76,7 @@ export default function ResumesClient() {
 			fetchResumes()
 		}
 
-		setData(null) // Clear data immediately to prevent showing stale results
+		setData(null)
 		fetchResumes()
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [statusFilter, status])
