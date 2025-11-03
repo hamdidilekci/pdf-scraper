@@ -12,9 +12,12 @@ export class OTPService {
 	}
 
 	generateOTP(): string {
+		const crypto = require('crypto')
 		let otp = ''
 		for (let i = 0; i < OTP.LENGTH; i++) {
-			otp += OTP.DIGITS[Math.floor(Math.random() * 10)]
+			// Use cryptographically secure random
+			const randomValue = crypto.randomInt(0, 10)
+			otp += OTP.DIGITS[randomValue]
 		}
 		return otp
 	}

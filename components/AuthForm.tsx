@@ -24,6 +24,7 @@ export default function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 	const router = useRouter()
 	const [error, setError] = useState<string | null>(null)
 	const [loading, setLoading] = useState(false)
+	const [failedAttempts, setFailedAttempts] = useState(0)
 
 	const {
 		register,
@@ -85,13 +86,39 @@ export default function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 				redirect: false
 			})
 			if (!res || res.error) {
+				// Check if account is blocked (rate limited)
+				if (res?.error?.startsWith('AccountBlocked:')) {
+					const minutes = res.error.split(':')[1]
+					const errorMsg = `Too many failed login attempts. Your account is temporarily locked. Please try again in ${minutes} minutes.`
+					toast.error(errorMsg, { duration: 8000 })
+					setFailedAttempts(0) // Reset visual counter
+					throw new Error(errorMsg)
+				}
+
+				// Track failed attempts for warning
+				const newFailedAttempts = failedAttempts + 1
+				setFailedAttempts(newFailedAttempts)
+
 				const errorMsg =
 					res?.error === 'CredentialsSignin'
 						? 'Invalid email or password. Please check your credentials and try again'
 						: res?.error || 'We could not sign you in. Please try again'
-				toast.error(errorMsg)
+
+				// Warn user if they're close to being locked out
+				if (newFailedAttempts >= 3 && newFailedAttempts < 5) {
+					const remaining = 5 - newFailedAttempts
+					toast.error(`${errorMsg}\n\n⚠️ Warning: ${remaining} attempt${remaining > 1 ? 's' : ''} remaining before temporary lockout.`, {
+						duration: 6000
+					})
+				} else {
+					toast.error(errorMsg)
+				}
+
 				throw new Error(errorMsg)
 			}
+
+			// Reset failed attempts on success
+			setFailedAttempts(0)
 			toast.success('Welcome back! Redirecting to your dashboard...')
 			router.replace('/')
 		} catch (err: any) {

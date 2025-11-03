@@ -50,7 +50,8 @@ export async function POST(request: Request) {
 
 		if (!user) {
 			logger.warn('Reset password attempted for non-existent user', { email: normalizedEmail })
-			throw notFound('User not found')
+			// Return generic error to prevent email enumeration
+			throw badRequest('Invalid or expired verification code. Please request a new one.')
 		}
 
 		// Hash new password

@@ -28,17 +28,26 @@ export class EmailService {
 			})
 
 			if (error) {
-				logger.error('Failed to send password reset email', error, { email })
-				throw new Error('We could not send the verification email. Please try again')
+				// Log the full error details from Resend
+				logger.error('Failed to send password reset email', undefined, {
+					email,
+					resendError: error,
+					errorMessage: error.message,
+					errorName: error.name,
+					fullError: JSON.stringify(error, null, 2)
+				})
+				throw new Error(`Email sending failed: ${error.message || 'Unknown error'}`)
 			}
 
 			logger.info('Password reset OTP email sent', { email, emailId: data?.id })
 		} catch (error) {
-			logger.error('Email service error', error, { email })
-			// Re-throw with user-friendly message if it's not already an Error with message
-			if (error instanceof Error && error.message !== 'We could not send the verification email. Please try again') {
-				throw error
-			}
+			logger.error('Email service error', error, {
+				email,
+				errorType: typeof error,
+				errorConstructor: error?.constructor?.name
+			})
+
+			// Re-throw the error with details
 			if (error instanceof Error) {
 				throw error
 			}
