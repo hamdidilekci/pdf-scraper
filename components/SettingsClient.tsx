@@ -23,6 +23,25 @@ export default function SettingsClient() {
 	// Stripe configuration - assume configured, will show error messages if not
 	const [isStripeConfigured, setIsStripeConfigured] = useState(true)
 
+	const fetchSettings = async () => {
+		try {
+			const response = await fetch('/api/user')
+			const result = await response.json().catch(() => ({}))
+
+			if (response.ok && result.success && result.data) {
+				setData(result.data)
+			} else {
+				const errorMsg = result?.error?.message || 'We could not load your settings. Please refresh the page'
+				toast.error(errorMsg)
+			}
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'We could not load your settings. Please refresh the page'
+			toast.error(errorMessage)
+		} finally {
+			setLoading(false)
+		}
+	}
+
 	// Check for success/cancel query params from Stripe redirects
 	useEffect(() => {
 		const success = searchParams.get('success')
@@ -30,6 +49,8 @@ export default function SettingsClient() {
 
 		if (success === 'true') {
 			toast.success('Subscription activated successfully! Your credits have been added.')
+			// Refetch user data to show updated credits
+			fetchSettings()
 			// Remove query param
 			router.replace('/settings')
 		} else if (canceled === 'true') {
@@ -39,25 +60,6 @@ export default function SettingsClient() {
 	}, [searchParams, router])
 
 	useEffect(() => {
-		const fetchSettings = async () => {
-			try {
-				const response = await fetch('/api/user')
-				const result = await response.json().catch(() => ({}))
-
-				if (response.ok && result.success && result.data) {
-					setData(result.data)
-				} else {
-					const errorMsg = result?.error?.message || 'We could not load your settings. Please refresh the page'
-					toast.error(errorMsg)
-				}
-			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'We could not load your settings. Please refresh the page'
-				toast.error(errorMessage)
-			} finally {
-				setLoading(false)
-			}
-		}
-
 		fetchSettings()
 	}, [])
 
