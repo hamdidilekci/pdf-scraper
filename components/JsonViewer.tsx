@@ -45,8 +45,11 @@ export default function JsonViewer({ data, loading = false }: JsonViewerProps) {
 	}
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<div className="flex gap-3">
+				<div className="flex items-center justify-between">
+					<h3 className="text-base font-semibold">Extracted Data</h3>
+				</div>
 				<Button variant="outline" size="sm" onClick={onCopy}>
 					<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path

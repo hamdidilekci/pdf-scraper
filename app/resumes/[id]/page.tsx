@@ -65,36 +65,13 @@ export default async function ResumeDetailPage({ params }: Props) {
 				<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
 				</svg>
-				<span className="text-gray-900 font-medium truncate max-w-xs">Resume Detail</span>
+				<span className="text-gray-900 font-medium max-w-xs">Resume Detail</span>
 			</nav>
-
-			{/* Title and Status */}
-			<div className="flex items-center justify-between">
-				<h1 className="text-2xl font-semibold text-gray-900 truncate">{item.fileName}</h1>
-				<div className="flex items-center space-x-2 flex-shrink-0">
-					<span
-						className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-							item.status === 'COMPLETED'
-								? 'bg-green-100 text-green-800'
-								: item.status === 'PENDING'
-								? 'bg-yellow-100 text-yellow-800'
-								: 'bg-red-100 text-red-800'
-						}`}
-					>
-						{item.status}
-					</span>
-					{item.error && (
-						<span className="text-xs text-red-600" title={item.error}>
-							⚠️ Error
-						</span>
-					)}
-				</div>
-			</div>
 
 			{/* Side-by-side layout */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				{/* Left column - PDF Preview */}
-				<div className="space-y-4">
+				<div className="rounded border bg-white p-6">
 					<PdfViewer storagePath={item.storagePath} fileName={item.fileName} />
 
 					{/* File metadata */}
@@ -118,10 +95,6 @@ export default async function ResumeDetailPage({ params }: Props) {
 
 				{/* Right column - Extracted Data */}
 				<div className="space-y-4">
-					<div className="flex items-center justify-between">
-						<h3 className="text-lg font-semibold">Extracted Data</h3>
-					</div>
-
 					<div className="rounded border bg-white p-6">
 						{item?.resumeData ? (
 							<JsonViewer data={item.resumeData} />
