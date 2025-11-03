@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 		const customer = await stripeService.getOrCreateCustomer(user.email, userId, user.stripeCustomerId)
 
 		// Create checkout session
-		const session = await stripeService.createCheckoutSession(customer.id, priceId, userId)
+		const session = await stripeService.createCheckoutSession(customer.id, priceId, userId, planType)
 
 		return success({ url: session.url })
 	} catch (error) {

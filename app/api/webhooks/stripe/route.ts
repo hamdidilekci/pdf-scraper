@@ -29,6 +29,71 @@ async function getRawBody(request: Request): Promise<Buffer> {
 	return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))
 }
 
+type CheckoutSessionWithMetadata = Stripe.Checkout.Session & {
+	metadata?: {
+		userId?: string
+		planType?: string
+		priceId?: string
+	}
+}
+
+type InvoiceWithSubscription = Stripe.Invoice & {
+	subscription?: string | Stripe.Subscription | null
+	subscription_details?: {
+		subscription?: string | Stripe.Subscription | null
+	}
+}
+
+type InvoiceLineWithPrice = Stripe.InvoiceLineItem & {
+	price?: Stripe.Price | null
+	plan?: Stripe.Plan | null
+}
+
+function extractSubscriptionId(invoice: InvoiceWithSubscription): string | null {
+	if (typeof invoice.subscription === 'string') {
+		return invoice.subscription
+	}
+	if (invoice.subscription && typeof invoice.subscription === 'object') {
+		return invoice.subscription.id
+	}
+	if (typeof invoice.subscription_details?.subscription === 'string') {
+		return invoice.subscription_details.subscription
+	}
+	if (invoice.subscription_details?.subscription && typeof invoice.subscription_details.subscription === 'object') {
+		return invoice.subscription_details.subscription.id
+	}
+
+	if (invoice.lines?.data) {
+		for (const line of invoice.lines.data) {
+			const lineWithSub = line as InvoiceLineWithPrice & { subscription?: string | { id?: string } }
+			if (lineWithSub.subscription) {
+				if (typeof lineWithSub.subscription === 'string') {
+					return lineWithSub.subscription
+				}
+				if (typeof lineWithSub.subscription === 'object' && lineWithSub.subscription.id) {
+					return lineWithSub.subscription.id
+				}
+			}
+		}
+	}
+
+	return null
+}
+
+function extractPriceIdFromInvoice(invoice: Stripe.Invoice): string | null {
+	const lines = invoice.lines?.data ?? []
+	for (const line of lines) {
+		const lineWithPrice = line as InvoiceLineWithPrice
+		if (lineWithPrice.price?.id) {
+			return lineWithPrice.price.id
+		}
+		if (lineWithPrice.plan?.id) {
+			return lineWithPrice.plan.id
+		}
+	}
+	return null
+}
+
 export async function POST(request: NextRequest) {
 	const stripeService = new StripeService()
 	const creditService = new CreditService()
@@ -68,7 +133,7 @@ export async function POST(request: NextRequest) {
 					data: event.data.object as any,
 					processed: false
 				},
-				update: {} // Don't update if already exists (idempotency)
+				update: {} // idempotency
 			})
 		} catch (error) {
 			// Log error but continue processing
@@ -102,8 +167,8 @@ async function processWebhookEvent(event: Stripe.Event, creditService: CreditSer
 
 		switch (event.type) {
 			case 'checkout.session.completed': {
-				const session = event.data.object as Stripe.Checkout.Session
-				await handleCheckoutSessionCompleted(session, creditService, stripeService)
+				const session = event.data.object as CheckoutSessionWithMetadata
+				await handleCheckoutSessionCompleted(session, stripeService)
 				break
 			}
 
@@ -119,9 +184,9 @@ async function processWebhookEvent(event: Stripe.Event, creditService: CreditSer
 				break
 			}
 
-			case 'invoice.paid': {
+			case 'invoice.payment_succeeded': {
 				const invoice = event.data.object as Stripe.Invoice
-				await handleInvoicePaid(invoice, creditService, stripeService)
+				await handleInvoicePaymentSucceeded(invoice, creditService, stripeService)
 				break
 			}
 
@@ -148,11 +213,7 @@ async function processWebhookEvent(event: Stripe.Event, creditService: CreditSer
 	}
 }
 
-async function handleCheckoutSessionCompleted(
-	session: Stripe.Checkout.Session,
-	creditService: CreditService,
-	stripeService: StripeService
-): Promise<void> {
+async function handleCheckoutSessionCompleted(session: CheckoutSessionWithMetadata, stripeService: StripeService): Promise<void> {
 	try {
 		const userId = session.metadata?.userId
 		if (!userId) {
@@ -166,46 +227,49 @@ async function handleCheckoutSessionCompleted(
 			return
 		}
 
-		// Get subscription to determine plan type
-		const subscription = await stripeService.getSubscription(subscriptionId)
-		if (!subscription) {
-			logger.warn('Subscription not found', { subscriptionId })
-			return
+		let planType: 'BASIC' | 'PRO' | null = null
+		const metadataPlan = session.metadata?.planType
+		if (metadataPlan === PLAN_TYPES.BASIC || metadataPlan === PLAN_TYPES.PRO) {
+			planType = metadataPlan
 		}
 
-		const priceId = subscription.items.data[0]?.price.id
-		const planType = priceId === config.stripe.priceBasic ? PLAN_TYPES.BASIC : priceId === config.stripe.pricePro ? PLAN_TYPES.PRO : null
+		let priceId = session.metadata?.priceId
 
-		if (!planType) {
-			logger.warn('Unknown plan type from subscription', { subscriptionId, priceId })
-			return
-		}
-
-		// Update user with subscription info and add credits
-		await prisma.$transaction(async (tx) => {
-			const user = await tx.user.findUnique({ where: { id: userId } })
-			if (!user) {
-				throw new Error(`User not found: ${userId}`)
+		if (!planType || !priceId) {
+			const subscription = await stripeService.getSubscription(subscriptionId)
+			if (!subscription) {
+				logger.warn('Subscription not found', { subscriptionId })
+				return
 			}
 
-			const creditsToAdd = planType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
+			priceId = priceId || subscription.items.data[0]?.price?.id || undefined
+			if (!planType && priceId) {
+				planType = priceId === config.stripe.priceBasic ? PLAN_TYPES.BASIC : priceId === config.stripe.pricePro ? PLAN_TYPES.PRO : null
+			}
+		}
 
-			await tx.user.update({
-				where: { id: userId },
-				data: {
-					planType,
-					stripeSubscriptionId: subscriptionId,
-					stripeCustomerId: session.customer as string,
-					credits: { increment: creditsToAdd }
-				}
+		if (!planType) {
+			logger.warn('Unable to resolve plan type from checkout session', {
+				sessionId: session.id,
+				metadataPlan,
+				priceId
 			})
+			return
+		}
 
-			logger.info('User subscription activated', {
-				userId,
+		const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id
+		if (!customerId) {
+			logger.warn('Checkout session missing customer', { sessionId: session.id })
+			return
+		}
+
+		await prisma.user.update({
+			where: { id: userId },
+			data: {
 				planType,
-				creditsAdded: creditsToAdd,
-				subscriptionId
-			})
+				stripeSubscriptionId: subscriptionId,
+				stripeCustomerId: customerId
+			}
 		})
 	} catch (error) {
 		logger.error('Error handling checkout.session.completed', error, { sessionId: session.id })
@@ -219,7 +283,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, cred
 
 		const user = await prisma.user.findFirst({
 			where: { stripeCustomerId: customerId },
-			select: { id: true, planType: true }
+			select: { id: true, planType: true, credits: true }
 		})
 
 		if (!user) {
@@ -235,36 +299,30 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, cred
 			return
 		}
 
-		// If upgrading from BASIC to PRO, add credits
-		if (user.planType === PLAN_TYPES.BASIC && newPlanType === PLAN_TYPES.PRO) {
-			const creditsToAdd = PLAN_CREDITS.PRO
+		const targetCredits = newPlanType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
+		const currentCredits = user.credits ?? 0
+		const delta = targetCredits - currentCredits
 
-			await prisma.user.update({
-				where: { id: user.id },
-				data: {
-					planType: newPlanType,
-					credits: { increment: creditsToAdd }
-				}
-			})
-
-			logger.info('User upgraded to Pro plan', {
-				userId: user.id,
-				creditsAdded: creditsToAdd,
-				subscriptionId: subscription.id
-			})
-		} else {
-			// Just update plan type
-			await prisma.user.update({
-				where: { id: user.id },
-				data: { planType: newPlanType }
-			})
-
-			logger.info('User subscription plan updated', {
-				userId: user.id,
-				planType: newPlanType,
-				subscriptionId: subscription.id
-			})
+		if (delta > 0) {
+			await creditService.addCredits(user.id, delta)
+		} else if (delta < 0) {
+			await creditService.deductCredits(user.id, Math.min(currentCredits, Math.abs(delta)))
 		}
+
+		await prisma.user.update({
+			where: { id: user.id },
+			data: { planType: newPlanType }
+		})
+
+		logger.info('User subscription plan normalized', {
+			userId: user.id,
+			previousPlanType: user.planType,
+			planType: newPlanType,
+			targetCredits,
+			previousCredits: currentCredits,
+			delta,
+			subscriptionId: subscription.id
+		})
 	} catch (error) {
 		logger.error('Error handling subscription.updated', error, { subscriptionId: subscription.id })
 		throw error
@@ -304,59 +362,101 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
 	}
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice, creditService: CreditService, stripeService: StripeService): Promise<void> {
+async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, creditService: CreditService, stripeService: StripeService): Promise<void> {
 	try {
-		// Only process if this is a subscription invoice
-		if (!invoice.subscription || typeof invoice.subscription === 'string') {
-			// This is a subscription invoice, but credits should already be added via checkout.session.completed
-			// Only add credits if this is a renewal (not the initial payment)
-			const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null
-			if (!subscriptionId) {
-				return
-			}
+		const expandedInvoice = await stripeService.getInvoice(invoice.id)
+		const invoiceData = (expandedInvoice || invoice) as InvoiceWithSubscription
 
-			const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
-			if (!customerId) {
-				return
-			}
+		const subscriptionId =
+			typeof invoiceData.subscription === 'string'
+				? invoiceData.subscription
+				: invoiceData.subscription && typeof invoiceData.subscription === 'object'
+				? invoiceData.subscription.id
+				: extractSubscriptionId(invoiceData)
 
-			const user = await prisma.user.findFirst({
-				where: { stripeCustomerId: customerId },
-				select: { id: true, planType: true }
-			})
+		const customerId =
+			typeof invoice.customer === 'string'
+				? invoice.customer
+				: invoice.customer && typeof invoice.customer === 'object'
+				? invoice.customer.id || (invoice.customer as any).customer
+				: typeof expandedInvoice?.customer === 'string'
+				? (expandedInvoice.customer as string)
+				: null
 
-			if (!user || !user.planType) {
-				return
-			}
-
-			// Check if this is a renewal (not the first invoice)
-			// If the subscription was created recently, skip (already handled by checkout.session.completed)
-			const subscription = await stripeService.getSubscription(subscriptionId)
-			if (!subscription) {
-				return
-			}
-
-			// Only add credits for renewals (not initial payment)
-			// Initial payment is handled by checkout.session.completed
-			const subscriptionAge = Date.now() - subscription.created * 1000
-			if (subscriptionAge < 60000) {
-				// Less than 1 minute old, likely initial payment
-				return
-			}
-
-			const creditsToAdd = user.planType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
-
-			await creditService.addCredits(user.id, creditsToAdd)
-
-			logger.info('Credits added for subscription renewal', {
-				userId: user.id,
-				planType: user.planType,
-				creditsAdded: creditsToAdd,
-				invoiceId: invoice.id
-			})
+		if (!customerId) {
+			logger.warn('Invoice payment succeeded without customer ID', { invoiceId: invoice.id })
+			return
 		}
+
+		const priceId = extractPriceIdFromInvoice(invoiceData)
+		let planType: 'BASIC' | 'PRO' | null =
+			priceId === config.stripe.priceBasic ? PLAN_TYPES.BASIC : priceId === config.stripe.pricePro ? PLAN_TYPES.PRO : null
+
+		const user = await prisma.user.findFirst({
+			where: { stripeCustomerId: customerId },
+			select: { id: true, planType: true, credits: true }
+		})
+
+		if (!user) {
+			logger.warn('No user found for invoice payment', { customerId, invoiceId: invoice.id })
+			return
+		}
+
+		if (!planType && user.planType && (user.planType === PLAN_TYPES.BASIC || user.planType === PLAN_TYPES.PRO)) {
+			planType = user.planType
+		}
+
+		if (!planType && subscriptionId) {
+			const subscription = await stripeService.getSubscription(subscriptionId)
+			if (subscription) {
+				const subPriceId = subscription.items.data[0]?.price?.id
+				if (subPriceId) {
+					planType = subPriceId === config.stripe.priceBasic ? PLAN_TYPES.BASIC : subPriceId === config.stripe.pricePro ? PLAN_TYPES.PRO : null
+				}
+			}
+		}
+
+		if (!planType) {
+			logger.warn('Unable to determine plan type from invoice payment', {
+				invoiceId: invoice.id,
+				priceId,
+				subscriptionId,
+				expanded: !!expandedInvoice
+			})
+			return
+		}
+
+		const targetCredits = planType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
+		const currentCredits = user.credits ?? 0
+		const delta = targetCredits - currentCredits
+
+		if (delta > 0) {
+			await creditService.addCredits(user.id, delta)
+		} else if (delta < 0) {
+			await creditService.deductCredits(user.id, Math.min(currentCredits, Math.abs(delta)))
+		}
+
+		await prisma.user.update({
+			where: { id: user.id },
+			data: {
+				planType,
+				stripeCustomerId: customerId,
+				...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {})
+			}
+		})
+
+		logger.info('Credits normalized after invoice payment', {
+			userId: user.id,
+			planType,
+			targetCredits,
+			previousCredits: currentCredits,
+			delta,
+			invoiceId: invoice.id,
+			billingReason: expandedInvoice?.billing_reason || invoice.billing_reason,
+			subscriptionId
+		})
 	} catch (error) {
-		logger.error('Error handling invoice.paid', error, { invoiceId: invoice.id })
+		logger.error('Error handling invoice.payment_succeeded', error, { invoiceId: invoice.id })
 		throw error
 	}
 }
@@ -379,7 +479,8 @@ async function handleCustomerDeleted(customer: Stripe.Customer): Promise<void> {
 			data: {
 				planType: null,
 				stripeSubscriptionId: null,
-				stripeCustomerId: null
+				stripeCustomerId: null,
+				credits: 0
 			}
 		})
 

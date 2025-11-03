@@ -4,7 +4,8 @@ import { logger } from '@/lib/logger'
 import prisma from '@/lib/prisma'
 
 // Initialize Stripe client only if configured
-const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey, { apiVersion: '2025-10-29.clover' }) : null
+const STRIPE_API_VERSION = '2025-10-29.clover' as const
+const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey, { apiVersion: STRIPE_API_VERSION as Stripe.LatestApiVersion }) : null
 
 export class StripeService {
 	/**
@@ -73,7 +74,7 @@ export class StripeService {
 	/**
 	 * Create a checkout session
 	 */
-	async createCheckoutSession(customerId: string, priceId: string, userId: string): Promise<Stripe.Checkout.Session> {
+	async createCheckoutSession(customerId: string, priceId: string, userId: string, planType: 'BASIC' | 'PRO'): Promise<Stripe.Checkout.Session> {
 		if (!this.isConfigured()) {
 			throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.')
 		}
@@ -91,7 +92,15 @@ export class StripeService {
 				success_url: `${config.nextAuth.url}/settings?success=true`,
 				cancel_url: `${config.nextAuth.url}/settings?canceled=true`,
 				metadata: {
-					userId
+					userId,
+					priceId,
+					planType
+				},
+				subscription_data: {
+					metadata: {
+						userId,
+						planType
+					}
 				}
 			})
 
@@ -175,6 +184,21 @@ export class StripeService {
 		} catch (error) {
 			logger.error('Error constructing webhook event', error)
 			throw error
+		}
+	}
+
+	async getInvoice(invoiceId: string): Promise<Stripe.Invoice | null> {
+		if (!this.isConfigured()) {
+			return null
+		}
+
+		try {
+			return await stripe!.invoices.retrieve(invoiceId, {
+				expand: ['lines.data.price', 'subscription']
+			})
+		} catch (error) {
+			logger.error('Error getting invoice', error, { invoiceId })
+			return null
 		}
 	}
 }
