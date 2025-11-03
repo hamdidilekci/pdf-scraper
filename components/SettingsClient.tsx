@@ -20,8 +20,6 @@ export default function SettingsClient() {
 	const [data, setData] = useState<UserSettings | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [processing, setProcessing] = useState<string | null>(null)
-	// Stripe configuration - assume configured, will show error messages if not
-	const [isStripeConfigured, setIsStripeConfigured] = useState(true)
 
 	const fetchSettings = async () => {
 		try {
@@ -49,8 +47,19 @@ export default function SettingsClient() {
 
 		if (success === 'true') {
 			toast.success('Subscription activated successfully! Your credits have been added.')
-			// Refetch user data to show updated credits
-			fetchSettings()
+
+			// Poll for updated data (webhook might still be processing)
+			const pollForUpdates = async (attempts = 0, maxAttempts = 5) => {
+				await fetchSettings()
+
+				// If this is not the last attempt, schedule another poll
+				if (attempts < maxAttempts - 1) {
+					setTimeout(() => pollForUpdates(attempts + 1, maxAttempts), 2000)
+				}
+			}
+
+			pollForUpdates()
+
 			// Remove query param
 			router.replace('/settings')
 		} else if (canceled === 'true') {
@@ -64,11 +73,6 @@ export default function SettingsClient() {
 	}, [])
 
 	const handleCheckout = async (planType: 'BASIC' | 'PRO') => {
-		if (!isStripeConfigured) {
-			toast.error('Payment service is not configured. Please contact support.')
-			return
-		}
-
 		try {
 			setProcessing(planType)
 
@@ -96,11 +100,6 @@ export default function SettingsClient() {
 	}
 
 	const handlePortal = async () => {
-		if (!isStripeConfigured) {
-			toast.error('Payment service is not configured. Please contact support.')
-			return
-		}
-
 		try {
 			setProcessing('portal')
 
@@ -161,7 +160,6 @@ export default function SettingsClient() {
 		)
 	}
 
-	const canUpgrade = data.planType !== PLAN_TYPES.PRO
 	const showBasicButton = data.planType === null
 	const showUpgradeButton = data.planType === PLAN_TYPES.BASIC
 
@@ -212,73 +210,67 @@ export default function SettingsClient() {
 				</div>
 
 				{/* Action Buttons */}
-				{isStripeConfigured ? (
-					<div className="space-y-3 pt-4">
-						{showBasicButton && (
-							<Button onClick={() => handleCheckout(PLAN_TYPES.BASIC)} disabled={!!processing} className="w-full" variant="default">
-								{processing === PLAN_TYPES.BASIC ? (
-									<>
-										<svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-											<path
-												className="opacity-75"
-												fill="currentColor"
-												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-											></path>
-										</svg>
-										Processing...
-									</>
-								) : (
-									'Subscribe to Basic Plan'
-								)}
-							</Button>
-						)}
+				<div className="space-y-3 pt-4">
+					{showBasicButton && (
+						<Button onClick={() => handleCheckout(PLAN_TYPES.BASIC)} disabled={!!processing} className="w-full" variant="default">
+							{processing === PLAN_TYPES.BASIC ? (
+								<>
+									<svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+										<path
+											className="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+									Processing...
+								</>
+							) : (
+								'Subscribe to Basic Plan'
+							)}
+						</Button>
+					)}
 
-						{showUpgradeButton && (
-							<Button onClick={() => handleCheckout(PLAN_TYPES.PRO)} disabled={!!processing} className="w-full" variant="default">
-								{processing === PLAN_TYPES.PRO ? (
-									<>
-										<svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-											<path
-												className="opacity-75"
-												fill="currentColor"
-												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-											></path>
-										</svg>
-										Processing...
-									</>
-								) : (
-									'Upgrade to Pro Plan'
-								)}
-							</Button>
-						)}
+					{showUpgradeButton && (
+						<Button onClick={() => handleCheckout(PLAN_TYPES.PRO)} disabled={!!processing} className="w-full" variant="default">
+							{processing === PLAN_TYPES.PRO ? (
+								<>
+									<svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+										<path
+											className="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+									Processing...
+								</>
+							) : (
+								'Upgrade to Pro Plan'
+							)}
+						</Button>
+					)}
 
-						{data.hasSubscription && (
-							<Button onClick={handlePortal} disabled={!!processing} className="w-full" variant="outline">
-								{processing === 'portal' ? (
-									<>
-										<svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-											<path
-												className="opacity-75"
-												fill="currentColor"
-												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-											></path>
-										</svg>
-										Loading...
-									</>
-								) : (
-									'Manage Billing'
-								)}
-							</Button>
-						)}
-					</div>
-				) : (
-					<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-						<p className="text-sm text-yellow-800">Payment features are not currently available. Please contact support for subscription options.</p>
-					</div>
-				)}
+					{data.hasSubscription && (
+						<Button onClick={handlePortal} disabled={!!processing} className="w-full" variant="outline">
+							{processing === 'portal' ? (
+								<>
+									<svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+										<path
+											className="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+									Loading...
+								</>
+							) : (
+								'Manage Billing'
+							)}
+						</Button>
+					)}
+				</div>
 			</div>
 		</div>
 	)
