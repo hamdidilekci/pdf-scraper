@@ -4,6 +4,8 @@ import { success } from '@/lib/api-response'
 import { logger } from '@/lib/logger'
 import prisma from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
 	try {
 		const userId = await requireAuthenticatedUser()

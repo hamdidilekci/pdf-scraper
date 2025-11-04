@@ -3,6 +3,8 @@ import { RateLimitService } from '@/lib/services/rate-limit.service'
 import { OTPService } from '@/lib/services/otp.service'
 import { logger } from '@/lib/logger'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * Cleanup endpoint for rate limits and OTPs
  * Should be called periodically via a cron job

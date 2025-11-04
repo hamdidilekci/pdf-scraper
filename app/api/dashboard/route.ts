@@ -4,6 +4,8 @@ import { success } from '@/lib/api-response'
 import { ResumeService } from '@/lib/services/resume.service'
 import { logger } from '@/lib/logger'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
 	try {
 		const userId = await requireAuthenticatedUser()
