@@ -11,7 +11,7 @@ The application uses Vercel Cron Jobs to run scheduled cleanup tasks automatical
 ### 1. Rate Limit & OTP Cleanup
 
 **Path:** `/api/cron/cleanup-rate-limits`  
-**Schedule:** `0 * * * *` (Every hour, at the start of the hour)  
+**Schedule:** `0 */6 * * *` (Every 6 hours)  
 **Function:** Removes expired rate limit attempts and OTP records
 
 #### What It Cleans:
@@ -36,7 +36,7 @@ The cron schedule is defined in `vercel.json`:
 	"crons": [
 		{
 			"path": "/api/cron/cleanup-rate-limits",
-			"schedule": "0 * * * *"
+			"schedule": "0 */6 * * *"
 		}
 	]
 }
@@ -179,52 +179,6 @@ Check your application logs for:
 [INFO] Cleaned up expired OTPs { count: Y }
 [INFO] Cron cleanup completed successfully
 ```
-
-### Error Handling
-
-If the cron job fails, you'll see:
-
-```
-[ERROR] Cron cleanup failed { error: "..." }
-```
-
-The endpoint returns a 500 status code on failure, which Vercel will log.
-
-## Troubleshooting
-
-### Cron Job Not Running
-
-1. **Check Vercel Dashboard:**
-
-   - Ensure the cron job appears in Settings → Cron Jobs
-   - Verify it's enabled (not paused)
-
-2. **Check Function Logs:**
-
-   - Go to Deployments → Select deployment → Functions
-   - Look for execution logs at the scheduled time
-
-3. **Verify vercel.json:**
-   - Ensure `vercel.json` is in the project root
-   - Check JSON syntax is valid
-   - Redeploy if you made changes
-
-### Authentication Errors
-
-If you see "Unauthorized" errors:
-
-1. **On Vercel:** The `x-vercel-cron` header should be present automatically
-2. **Local Testing:** Either:
-   - Remove `CRON_SECRET` from `.env.local` to allow unauthenticated access locally
-   - Or include the `Authorization: Bearer <secret>` header in your requests
-
-### Database Connection Issues
-
-If cleanup fails with database errors:
-
-- Verify your `DATABASE_URL` is correctly set in Vercel environment variables
-- Check database connection limits
-- Review Prisma logs for connection issues
 
 ## Best Practices
 
