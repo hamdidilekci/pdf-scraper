@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { StripeService } from '@/lib/services/stripe.service'
-import { CreditService } from '@/lib/services/credit.service'
 import { config } from '@/lib/config'
 import { logger } from '@/lib/logger'
 import { PLAN_TYPES, PLAN_CREDITS } from '@/lib/constants'
@@ -75,7 +74,6 @@ function extractPriceIdFromInvoice(invoice: Stripe.Invoice): string | null {
 
 export async function POST(request: NextRequest) {
 	const stripeService = new StripeService()
-	const creditService = new CreditService()
 
 	try {
 		// Check if Stripe is configured
@@ -120,7 +118,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Process event asynchronously (return 200 immediately)
-		processWebhookEvent(event, creditService, stripeService).catch((error) => {
+		processWebhookEvent(event, stripeService).catch((error) => {
 			logger.error('Error processing webhook event', error, { eventId: event.id, eventType: event.type })
 		})
 
@@ -131,7 +129,7 @@ export async function POST(request: NextRequest) {
 	}
 }
 
-async function processWebhookEvent(event: Stripe.Event, creditService: CreditService, stripeService: StripeService): Promise<void> {
+async function processWebhookEvent(event: Stripe.Event, stripeService: StripeService): Promise<void> {
 	try {
 		// Check if event was already processed
 		const existingEvent = await prisma.stripeWebhookEvent.findUnique({
@@ -153,13 +151,13 @@ async function processWebhookEvent(event: Stripe.Event, creditService: CreditSer
 
 			case 'customer.subscription.created': {
 				const subscription = event.data.object as Stripe.Subscription
-				await handleSubscriptionCreated(subscription, creditService)
+				await handleSubscriptionCreated(subscription)
 				break
 			}
 
 			case 'customer.subscription.updated': {
 				const subscription = event.data.object as Stripe.Subscription
-				await handleSubscriptionUpdated(subscription, creditService)
+				await handleSubscriptionUpdated(subscription)
 				break
 			}
 
@@ -171,7 +169,7 @@ async function processWebhookEvent(event: Stripe.Event, creditService: CreditSer
 
 			case 'invoice.payment_succeeded': {
 				const invoice = event.data.object as Stripe.Invoice
-				await handleInvoicePaymentSucceeded(invoice, creditService, stripeService)
+				await handleInvoicePaymentSucceeded(invoice, stripeService)
 				break
 			}
 
@@ -272,7 +270,7 @@ async function handleCheckoutSessionCompleted(session: CheckoutSessionWithMetada
 	}
 }
 
-async function handleSubscriptionCreated(subscription: Stripe.Subscription, creditService: CreditService): Promise<void> {
+async function handleSubscriptionCreated(subscription: Stripe.Subscription): Promise<void> {
 	try {
 		const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
 		const userId = subscription.metadata?.userId
@@ -327,7 +325,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription, cred
 	}
 }
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription, creditService: CreditService): Promise<void> {
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<void> {
 	try {
 		const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
 
@@ -399,7 +397,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
 	}
 }
 
-async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, creditService: CreditService, stripeService: StripeService): Promise<void> {
+async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, stripeService: StripeService): Promise<void> {
 	try {
 		const expandedInvoice = await stripeService.getInvoice(invoice.id)
 		const invoiceData = (expandedInvoice || invoice) as InvoiceWithSubscription
@@ -463,17 +461,17 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, creditServ
 			return
 		}
 
+		const creditsToAdd = planType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
+
 		await prisma.user.update({
 			where: { id: user.id },
 			data: {
 				planType,
 				stripeCustomerId: customerId,
-				...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {})
+				...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
+				credits: { increment: creditsToAdd }
 			}
 		})
-
-		const creditsToAdd = planType === PLAN_TYPES.BASIC ? PLAN_CREDITS.BASIC : PLAN_CREDITS.PRO
-		await creditService.addCredits(user.id, creditsToAdd)
 
 		logger.info('Credits added after invoice payment', {
 			userId: user.id,
