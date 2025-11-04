@@ -28,19 +28,17 @@ export async function POST(req: Request) {
 		const resumeService = new ResumeService()
 		const storageService = new StorageService()
 		const creditService = new CreditService()
+		let shouldDeductCredits = true
 
 		// Check credits before extraction
-		try {
-			const hasCredits = await creditService.checkCredits(userId, CREDITS_PER_RESUME)
-			if (!hasCredits) {
-				throw badRequest(
-					`You don't have enough credits. Each resume extraction costs ${CREDITS_PER_RESUME} credits. Please upgrade your plan or purchase more credits.`
-				)
-			}
-		} catch (error) {
-			// If credit service fails (e.g., Stripe not configured), log and continue
-			// This allows the app to work without Stripe
-			logger.warn('Credit check failed, proceeding without credit check', { error, userId })
+
+		const hasCredits = await creditService.checkCredits(userId, CREDITS_PER_RESUME)
+		if (!hasCredits) {
+			shouldDeductCredits = false
+			logger.warn('User has insufficient credits, continuing extraction without deduction', {
+				userId,
+				requiredCredits: CREDITS_PER_RESUME
+			})
 		}
 
 		// Find resume
@@ -61,17 +59,26 @@ export async function POST(req: Request) {
 			model: DEFAULT_OPENAI_MODEL
 		})
 
-		// Deduct credits after successful extraction
+		// Deduct credits after successful extraction if applicable
 		try {
-			await creditService.deductCredits(userId, CREDITS_PER_RESUME)
-			logger.info('Credits deducted after successful extraction', { userId, amount: CREDITS_PER_RESUME })
+			if (shouldDeductCredits) {
+				await creditService.deductCredits(userId, CREDITS_PER_RESUME)
+				logger.info('Credits deducted after successful extraction', { userId, amount: CREDITS_PER_RESUME })
+			} else {
+				logger.warn('Skipped credit deduction due to insufficient credits', {
+					userId,
+					requiredCredits: CREDITS_PER_RESUME
+				})
+			}
 		} catch (error) {
 			// Log error but don't fail the request since extraction already succeeded
 			// In production, you might want to handle this differently (e.g., queue for retry)
 			logger.error('Failed to deduct credits after extraction', error, { userId, amount: CREDITS_PER_RESUME })
 		}
 
-		return success({ resumeId: result.resumeId })
+		return success({
+			resumeId: result.resumeId
+		})
 	} catch (error) {
 		if (error instanceof Error && error.message === 'Unauthorized') {
 			throw unauthorized()

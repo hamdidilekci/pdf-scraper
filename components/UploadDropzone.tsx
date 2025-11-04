@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, SUPPORTED_FILE_TYPES } from '@/lib/constants'
+import { MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, SUPPORTED_FILE_TYPES, CREDITS_PER_RESUME } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { useRouter } from 'next/navigation'
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'done' | 'error'
 
@@ -16,6 +17,26 @@ export default function UploadDropzone() {
 	const [step, setStep] = useState<Step>('idle')
 	const inputRef = useRef<HTMLInputElement>(null)
 	const [uploadProgress, setUploadProgress] = useState(0)
+	const [userCredits, setUserCredits] = useState<number | null>(null)
+	const [creditWarningShown, setCreditWarningShown] = useState(false)
+	const router = useRouter()
+
+	// Fetch user credits on mount
+	useEffect(() => {
+		const fetchCredits = async () => {
+			try {
+				const response = await fetch('/api/user')
+				const result = await response.json()
+				if (result.success) {
+					setUserCredits(result.data.credits)
+				}
+			} catch (error) {
+				// Silently fail - credit check will happen on backend anyway
+				console.warn('Failed to fetch user credits', error)
+			}
+		}
+		fetchCredits()
+	}, [])
 
 	const onSelect = useCallback((f: File) => {
 		setError(null)
@@ -63,13 +84,23 @@ export default function UploadDropzone() {
 
 	const start = useCallback(async () => {
 		if (!file) return
+
+		// Check credits before starting extraction
+		if (userCredits !== null && userCredits < CREDITS_PER_RESUME && !creditWarningShown) {
+			setCreditWarningShown(true)
+			toast.warning(
+				`You don't have enough credits. Each resume extraction costs ${CREDITS_PER_RESUME} credits. Please upgrade your plan or purchase more credits.`,
+				{
+					duration: 6000
+				}
+			)
+		}
+
 		setError(null)
 		setUploadProgress(0)
 
 		try {
 			setStep('uploading')
-			toast.info('Preparing to upload your file...')
-
 			// Step 1: Prepare upload URL (0-10%)
 			setUploadProgress(5)
 			const signedRes = await fetch('/api/storage/signed-url', {
@@ -87,7 +118,6 @@ export default function UploadDropzone() {
 			const { storagePath, signedUrl } = signedResult.data
 
 			// Step 2: Upload to storage (10-60%)
-			toast.info('Uploading your file...')
 			setUploadProgress(15)
 
 			// Use XMLHttpRequest for real upload progress tracking
@@ -131,7 +161,6 @@ export default function UploadDropzone() {
 			// Step 3: Send to OpenAI (60-85%)
 			setStep('extracting')
 			setUploadProgress(65)
-			toast.info('Analyzing your resume with AI...')
 
 			const resp = await fetch('/api/extract/responses', {
 				method: 'POST',
@@ -141,7 +170,7 @@ export default function UploadDropzone() {
 			setUploadProgress(75)
 
 			const extractResult = await resp.json().catch(() => ({}))
-			if (!resp.ok) {
+			if (!resp.ok || extractResult?.success === false) {
 				const errorMessage = extractResult?.error?.message || 'We could not extract information from your resume. Please try again'
 
 				// If it's a credit error, provide a more helpful message with link
@@ -178,8 +207,9 @@ export default function UploadDropzone() {
 
 			toast.success('Resume processed successfully! Redirecting...')
 			setStep('done')
+
 			setTimeout(() => {
-				window.location.href = '/resumes'
+				router.replace('/resumes')
 			}, 800)
 		} catch (err: any) {
 			setStep('error')
@@ -188,7 +218,7 @@ export default function UploadDropzone() {
 			setError(msg)
 			toast.error(msg)
 		}
-	}, [file])
+	}, [file, userCredits, creditWarningShown, router])
 
 	// No client-side rendering in Responses flow
 
