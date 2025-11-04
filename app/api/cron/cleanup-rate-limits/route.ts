@@ -24,14 +24,27 @@ export async function GET(request: Request) {
 		const isVercelCron = request.headers.get('x-vercel-cron') === '1'
 
 		// Allow if it's from Vercel Cron or has valid secret
-		const isAuthorized = isVercelCron || (cronSecret && authHeader === `Bearer ${cronSecret}`)
+		const hasValidToken = cronSecret && authHeader === `Bearer ${cronSecret}`
+		const isAuthorized = isVercelCron || hasValidToken
 
-		if (!isAuthorized && cronSecret) {
+		// Require authentication unless in development without CRON_SECRET
+		const isDevelopment = process.env.NODE_ENV === 'development'
+		const requireAuth = cronSecret || !isDevelopment
+
+		if (requireAuth && !isAuthorized) {
 			logger.warn('Unauthorized cron request', {
 				hasAuthHeader: !!authHeader,
-				isVercelCron
+				isVercelCron,
+				hasCronSecret: !!cronSecret,
+				isDevelopment
 			})
-			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+			return NextResponse.json(
+				{
+					error: 'Unauthorized',
+					message: 'This endpoint requires authentication. Set CRON_SECRET environment variable.'
+				},
+				{ status: 401 }
+			)
 		}
 
 		// Cleanup rate limits
